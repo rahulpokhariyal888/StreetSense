@@ -1,0 +1,8 @@
+# /etc/caddy/Caddyfile  (replace the domain with yours; Caddy gets and renews the HTTPS certificate by itself)
+your-domain.example {
+    encode gzip
+    request_body {
+        max_size 320MB
+    }
+    reverse_proxy 127.0.0.1:8000
+}

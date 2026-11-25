@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StreetSense — Contribute street footage</title>
+<script>try{var t=localStorage.getItem('streetsense-theme-v1');if(t)document.documentElement.dataset.theme=t==='dark'?'dark':'light'}catch(e){}</script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/insights.css?v=5"></head>
+<body>
+<header class="bar"><h1 class="brand">StreetSense · Contribute footage</h1><div><a href="/">Report a problem</a><a href="/transparency.html">Repair tracker</a></div></header>
+<section class="hero"><h1>Drive. Upload. Let the AI find the potholes.</h1><p>Citizens, delivery and ride drivers and transit staff can upload dashcam or phone footage. The scanner flags potholes, damaged signs and broken streetlights, plots them on the city map and raises repair work orders.</p></section>
+<main style="max-width:760px">
+<div id="login" class="card hide"><h2>Sign in to contribute</h2><div class="row"><input id="em" type="email" placeholder="Email" autocomplete="username"><input id="pw" type="password" placeholder="Password" autocomplete="current-password"><button class="btn" id="li">Sign in</button></div><div class="row"><input id="nm" placeholder="Name (new account)"><button class="btn alt" id="reg">Create account</button></div><p class="mute">Passwords need at least 10 characters.</p><div class="mute" id="lmsg"></div></div>
+<div id="up" class="card hide"><h2>Upload a drive</h2><div class="mute" id="who"></div>
+<div class="row"><input type="file" id="vf" accept="video/*"></div>
+<div class="row"><label>Start lat <input id="slat" size="9"></label><label>Start lng <input id="slng" size="9"></label><button class="btn alt" id="geo" type="button">Use my location</button></div>
+<div class="row"><label>End lat <input id="elat" size="9" placeholder="optional"></label><label>End lng <input id="elng" size="9" placeholder="optional"></label></div>
+<div class="row"><button class="btn" id="go">Upload and scan</button><span class="mute" id="msg"></span></div><div class="bar-h" id="bar" style="display:none"><i style="width:0"></i></div>
+<p class="mute">Up to 150 MB, 3 videos per hour. Add an end point so defects are placed along your route. Only road defects are used; faces and plates are not stored, just the flagged frames.</p></div>
+<div id="mine" class="card hide" style="margin-top:16px"><h2>Your uploads</h2><div id="jobs"></div></div>
+</main>
+<script src="/contribute.js?v=5"></script></body></html>

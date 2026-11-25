@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StreetSense — Introduction</title>
+<script>try{var t=localStorage.getItem('streetsense-theme-v1');if(t)document.documentElement.dataset.theme=t==='dark'?'dark':'light'}catch(e){}</script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/insights.css?v=11"></head>
+<body>
+<header class="bar"><h1 class="brand">StreetSense · Introduction</h1><div><a href="/">Home</a><a href="/transparency.html">Repair tracker</a><a href="/admin.html">Staff sign-in</a></div></header>
+<section class="hero"><h1>Introducing StreetSense</h1><p>A road-defect register for a city. Citizens report problems, an AI model helps spot them, a person always decides, crews get ranked repair routes, and everyone can see what is being fixed. This page lists everything the website has today and where to find it.</p></section>
+<main>
+
+<div class="sect"><h2>How a report becomes a repair</h2></div>
+<div class="steps">
+ <div class="card"><b>Report</b><div class="mute">A citizen files a street issue with a photo and location, or staff scan an image or upload drive footage.</div></div>
+ <div class="card"><b>AI check</b><div class="mute">A quick photo check rejects pictures that are clearly not roads. The road-defect model then finds defects, draws a box and gives a confidence score.</div></div>
+ <div class="card"><b>Human review</b><div class="mute">A reviewer confirms, corrects or rejects it. Nothing is repaired on AI output alone.</div></div>
+ <div class="card"><b>Prioritise</b><div class="mute">Each confirmed defect gets a condition score, liability flags and a repair deadline.</div></div>
+ <div class="card"><b>Work order</b><div class="mute">A work order is created and grouped into a daily route for a crew.</div></div>
+ <div class="card"><b>Repair &amp; proof</b><div class="mute">The crew uploads before and after photos, and the job closes.</div></div>
+ <div class="card"><b>Public update</b><div class="mute">The public tracker shows status, schedule and totals.</div></div>
+</div>
+
+<div class="sect"><h2>Everything on the site</h2></div>
+<h3>For everyone (no sign-in)</h3>
+<div class="grid g3">
+ <div class="card"><h2>Home and reporting</h2><p class="mute">The front door of the site.</p><ul><li>How reporting works, in three steps</li><li>Create an account, sign in, and file a report with category, description, location or phone GPS, and an optional photo</li><li>The photo can be analysed by the road-defect model, but a person always decides</li></ul><a class="btn" href="/">Open home</a></div>
+ <div class="card"><h2>Repair tracker</h2><p class="mute">Public transparency page.</p><ul><li>Search any street or area to see if a problem is already known</li><li>Map of scheduled repairs and citizen reports</li><li>Status and scheduled date, with crew assigned or not</li><li>Impact totals: potholes filled, repairs completed, active crews, estimated claim exposure avoided</li></ul><a class="btn" href="/transparency.html">Open tracker</a></div>
+ <div class="card"><h2>Introduction</h2><p class="mute">This page.</p><ul><li>What the site does and who uses which page</li><li>Live priority rules and model status</li><li>Honest limits and what is planned later</li></ul></div>
+</div>
+
+<h3 style="margin-top:20px">For citizens (free account)</h3>
+<div class="grid g3">
+ <div class="card"><h2>Report an issue</h2><ul><li>Pothole, road crack, damaged sign, broken streetlight, drain or other</li><li>Optional photo and GPS, never forced</li></ul></div>
+ <div class="card"><h2>Know where yours stands</h2><ul><li>Home page section that lists every report you filed</li><li>Status chips: Submitted, Under review, Assigned, In progress, Resolved, Rejected</li><li>Reviewer notes appear on the card; the list refreshes by itself</li></ul></div>
+ <div class="card"><h2>My reports</h2><ul><li>Quick pop-up of your reports from the top-right button</li></ul></div>
+</div>
+
+<h3 style="margin-top:20px">For staff (administrator sign-in)</h3>
+<div class="grid g2">
+ <div class="card"><h2>Admin console</h2><ul><li>Overview of complaints by status</li><li>Complaints inbox: read each report and its photo, change its status, add a reviewer note</li><li>Accounts: see and manage users</li><li>Settings: choose manual or automatic approval for new reports and AI detections, and clear all data when you want a fresh start (a database backup is saved first)</li><li>Shortcuts to both desks</li></ul><a class="btn" href="/admin.html">Open admin console</a></div>
+ <div class="card"><h2>Operations desk</h2><ul><li>Overview with critical issues and a dispatch queue</li><li>Live map of incidents, filters by severity</li><li>Reports register, work orders and analytics</li><li>Inbox for new citizen reports</li></ul><a class="btn" href="/operations.html">Open operations desk</a></div>
+ <div class="card"><h2>Scan an image</h2><ul><li>Upload a street photo; the model draws a box and confidence on every defect it finds</li><li>Place it on the map with phone GPS or a click</li><li>Send it to the review queue, or confirm it yourself</li></ul><a class="btn" href="/scan.html">Open scan page</a></div>
+ <div class="card"><h2>Intelligence desk</h2><p class="mute">Eight tabs:</p><ul><li><b>Heatmap &amp; risk</b>: map coloured by severity or predicted severity, a condition score, liability flags, citizen reports waiting for review</li><li><b>Review queue</b>: AI detections wait here; uncertain ones first; confirm, correct or reject; confirming creates the work order</li><li><b>Prediction</b>: rain, temperature swing and traffic show where roads are likely to get worse</li><li><b>Work orders &amp; routes</b>: groups open defects into daily crew routes and creates the orders</li><li><b>Equity &amp; budget</b>: spending versus need per zone, ROI, budget allocation</li><li><b>Repair verification</b>: before and after photos close the job</li><li><b>Metrics &amp; footage</b>: detection share, time-to-repair, cost per km, severity, and drive-video scanning</li><li><b>Crew view</b>: a crew's stops in order with GPS, materials and a Navigate link</li></ul><a class="btn" href="/insights.html">Open intelligence desk</a></div>
+</div>
+
+<div class="sect"><h2>Who uses what</h2></div>
+<div class="card tablewrap"><table><tr><th>Who</th><th>What they do</th><th>Where</th></tr>
+<tr><td>Citizens</td><td>Report problems, follow their reports, check the public tracker</td><td>Home, Repair tracker</td></tr>
+<tr><td>Reviewers and operators</td><td>Review reports and AI detections, scan images, upload footage</td><td>Admin console, Scan an image, Review queue</td></tr>
+<tr><td>City planners</td><td>Watch risk, equity, budget and performance numbers</td><td>Intelligence desk</td></tr>
+<tr><td>Maintenance crews</td><td>Follow ranked routes, log before and after photos</td><td>Crew view, Repair verification</td></tr></table></div>
+
+<div class="sect"><h2>Getting started</h2></div>
+<div class="grid g2">
+ <div class="card"><h3>As a citizen</h3><ol><li>Open the home page and create an account.</li><li>Press "Report an issue", describe the problem and add a photo or location.</li><li>Scroll to "Know where yours stands" to follow it.</li></ol></div>
+ <div class="card"><h3>As staff</h3><ol><li>Sign in at <a href="/admin.html">/admin.html</a> with an administrator account.</li><li>Open the Intelligence desk. For a demo, press "Load sample Delhi dataset" once.</li><li>Check the Review queue, then Work orders &amp; routes.</li><li>Use Repair verification when a job is done.</li></ol></div>
+</div>
+
+<div class="sect"><h2>Behind the scenes</h2></div>
+<div class="card"><ul><li>Everything is stored in a local SQLite database, with photos kept as evidence files and an audit log of staff actions.</li><li>Accounts use hashed passwords, and sign-ins survive a server restart for 12 hours.</li><li>Detection uses a YOLO11n road-defect model; images are resized to the size it was trained at first.</li><li>Maps use Leaflet and OpenStreetMap. Weather comes from Open-Meteo when online.</li></ul></div>
+
+<div class="sect"><h2>Honest limits</h2></div>
+<div class="card"><ul><li>The AI is a helper. Its measured scores (shown under Rules, model and data) are modest, so every detection needs human review.</li><li>Zone population, income, 311 counts, spending and repair costs are sample placeholders until you add real city data.</li><li>"Estimated claim exposure avoided" and the cost per km are assumptions, not audited savings.</li><li>The model can miss defects and mix up similar things, for example a water-filled pothole may be reported as waterlogging. Reviewers correct these, and the corrections are the data for the next training round.</li><li>The prediction is a rule-based formula, not a model trained on past failures.</li><li>Road speed, depth and width are estimated unless recorded.</li></ul></div>
+
+<div class="sect"><h2>Rules, model and data</h2></div>
+<details class="card"><summary><b>How priority is ranked</b></summary><p id="formula"></p><div class="grid g3"><div class="tablewrap" id="weights"></div><div class="tablewrap" id="grades"></div><div class="tablewrap" id="sla"></div></div><h3>Liability flags</h3><ul id="flags"></ul><p class="mute" id="extentnote"></p></details>
+<details class="card" style="margin-top:10px"><summary><b>Model and human review</b></summary><p id="policy"></p><div class="grid g2"><div><h3>Baseline</h3><div id="base"></div></div><div><h3>Live reviewer check</h3><div id="live"></div></div></div></details>
+<details class="card" style="margin-top:10px"><summary><b>Data and licence</b></summary><p>Dataset: RDD2022 (Geoscience Data Journal, doi:10.1002/gdj3.260; github.com/sekilab/RoadDamageDetector). India-Aug export via Roboflow Universe (rdd2022-india, v6), CC BY 4.0 as shown on the export; the original RDD repository lists CC BY-SA 4.0. Dataset images are not bundled with the platform.</p></details>
+
+<div class="sect"><h2>Planned for later</h2></div>
+<div class="card"><p>Fleet and citizen image capture, live fleet feeds and municipal API integrations are not part of this version.</p></div>
+</main>
+<script src="/introduction.js?v=11"></script></body></html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b2545">
+<meta name="description" content="Report potholes, broken lights and damaged signs. StreetSense puts every report on the map and tracks it to repair.">
+<title>StreetSense — Report a street problem</title>
+<script>try{var t=localStorage.getItem('streetsense-theme-v1');if(!t)t='light';document.documentElement.dataset.theme=t==='dark'?'dark':'light'}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/ss-base.css"><link rel="stylesheet" href="/portal.css">
+</head>
+<body class="citizen-page">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="pbar">
+  <a class="brand" href="/" aria-label="StreetSense home"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="/icons.svg#i-logo"/></svg><span class="brand-name">StreetSense<small>Urban observation network</small></span></a>
+  <nav class="pnav" aria-label="Sections"><a href="#how">How it works</a><a href="#status">Track a report</a><a href="#why">Why report</a><a href="/transparency.html">Repair tracker</a><a href="/introduction.html">Introduction</a><a href="/admin.html" class="admin-link">Staff ↗</a></nav>
+  <div class="nav-actions">
+  <button class="text-btn" id="open-login">Sign in</button>
+  <button class="btn btn-primary btn-sm" id="open-register">Create account</button>
+
+  <button class="notification-button hidden" id="notification-button"
+          type="button" aria-label="Notifications">
+    🔔
+    <span id="notification-count" hidden></span>
+  </button>
+
+  <button class="profile-chip hidden" id="profile-chip"
+          title="Open your reports"></button>
+</div>
+</header>
+
+<main id="main">
+<section class="hero">
+  <div class="hero-copy">
+    <div class="sheet-tag"><span class="plate">SHEET 00</span><span class="kicker">Delhi · Community reporting</span></div>
+    <h1 class="display">See a broken street? <em>Put it on the map.</em></h1>
+    <hr class="lane">
+    <p class="hero-lede">Photograph the pothole, flickering streetlight or bent sign. Your report is placed on the city map, checked by a reviewer and followed all the way to repair.</p>
+    <div class="hero-actions"><button class="btn btn-primary" id="hero-report">Report a street issue</button><a class="link-btn" href="#how">See the process</a></div>
+    <ul class="hero-facts"><li><b>1 min</b><span>to file a report</span></li><li><b>Photo + GPS</b><span>optional, never required</span></li><li><b>Human review</b><span>on every report</span></li></ul>
+  </div>
+  <figure class="hero-sheet" aria-label="Illustrative map showing three reported street issues">
+    <div class="hs-top"><span class="kicker">Field sheet · illustrative</span><span class="kicker">28°36′N 77°12′E</span></div>
+    <svg viewBox="0 0 620 470" role="img" aria-label="Stylised street map with three report pins">
+      <defs><pattern id="g" width="31" height="31" patternUnits="userSpaceOnUse"><path d="M31 0H0V31" fill="none" stroke="currentColor" stroke-opacity=".16"/></pattern></defs>
+      <rect width="620" height="470" fill="url(#g)"/>
+      <g fill="none" stroke="currentColor" stroke-opacity=".22" stroke-width="30"><path d="M-20 110 650 360"/><path d="M130 -20 350 500"/><path d="M510 -20 240 500"/><path d="M-20 390 650 70"/></g>
+      <g fill="none" stroke="#12d6b5" stroke-width="3" stroke-dasharray="16 14"><path d="M-20 110 650 360"/><path d="M130 -20 350 500"/><path d="M510 -20 240 500"/><path d="M-20 390 650 70"/></g>
+      <g fill="currentColor" fill-opacity=".09"><path d="M30 28h70v54H30zM170 24h70v50h-70zM395 26h76v56h-76zM535 120h60v70h-60zM28 270h74v64H28zM395 392h80v66h-80zM515 290h70v60h-70z"/></g>
+      <g stroke="#0b2545" stroke-width="2.5"><g transform="translate(178 166)"><rect x="-15" y="-15" width="30" height="30" fill="#d3341d"/><path d="M-15 -15h30v30h-30z" fill="none"/></g><g transform="translate(392 262)"><rect x="-15" y="-15" width="30" height="30" fill="#e2710a"/></g><g transform="translate(498 104)"><rect x="-15" y="-15" width="30" height="30" fill="#f4b400"/></g></g>
+      <g font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor"><text x="200" y="150">SS-031 · pothole</text><text x="414" y="246">SS-028 · light out</text><text x="390" y="90">SS-034 · sign</text></g>
+    </svg>
+    <div class="hs-foot"><span class="kicker">Observe → Report → Resolve</span><span class="plate">3 open</span></div>
+  </figure>
+</section>
+
+<div class="ticker" aria-hidden="true"><div>ROAD SAFETY ✳ PUBLIC PARTICIPATION ✳ SMARTER MAINTENANCE ✳ SHARED RESPONSIBILITY ✳ ROAD SAFETY ✳ PUBLIC PARTICIPATION ✳ SMARTER MAINTENANCE ✳ SHARED RESPONSIBILITY ✳</div></div>
+
+<section class="how" id="how">
+  <div class="how-intro"><span class="kicker">The street-to-solution loop</span><h2 class="display">Three steps. Nothing to chase.</h2><p>Every useful report gives a maintenance team a better starting point.</p></div>
+  <ol class="steps">
+    <li><span class="plate">01</span><h3>Pinpoint it</h3><p>Name the street, or let your phone share your location.</p></li>
+    <li><span class="plate">02</span><h3>Show it</h3><p>Add a clear photo so the reviewer sees what you see. Photos can be analysed by a road-defect model, but a person always decides.</p></li>
+    <li><span class="plate">03</span><h3>Follow it</h3><p>Open “My reports” to see whether it is submitted, under review, assigned or resolved.</p></li>
+  </ol>
+</section>
+
+<section class="status-band" id="status">
+  <div><span class="kicker">Every report has a status</span><h2 class="display">Know where yours stands.</h2></div>
+  <ol class="status-line"><li><span class="st st-submitted">Submitted</span></li><li><span class="st st-under-review">Under review</span></li><li><span class="st st-assigned">Assigned</span></li><li><span class="st st-in-progress">In progress</span></li><li><span class="st st-resolved">Resolved</span></li></ol>
+  <div id="status-list" class="status-list" aria-live="polite"><p class="status-note">Loading your reports…</p></div>
+</section>
+
+<section class="why" id="why">
+  <div><span class="kicker">A better way to be heard</span><h2 class="display">Your street is part of the bigger picture.</h2></div>
+  <p>StreetSense brings citizen observations and road-condition data into one register. Reports are reviewed by authorised staff; automated image analysis, when installed, only assists that review.</p>
+  <button class="btn btn-primary" id="impact-report">Add your observation</button>
+</section>
+<section id="notification-panel" class="notification-panel" hidden>
+  <div class="notification-header">
+    <h2>Notifications</h2>
+    <button id="notification-mark-all" type="button">
+      Mark all as read
+    </button>
+  </div>
+
+  <div id="notification-list" aria-live="polite">
+    Loading notifications...
+  </div>
+</section>
+</main>
+
+<footer class="pfoot"><span class="kicker">StreetSense · Built for streets that work better for everyone</span><span class="kicker">© 2026</span></footer>
+
+<div class="modal hidden" id="auth-modal"><div class="modal-scrim" data-close></div><section class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title"><i class="hz"></i><button class="icon-btn close-x" data-close aria-label="Close"><svg class="i"><use href="/icons.svg#i-close"/></svg></button><div class="pad"><span class="kicker" id="auth-kicker">WELCOME BACK</span><h2 id="auth-title">Good to see you.</h2><p id="auth-subtitle">Sign in to follow your reports and share a new observation.</p>
+<form id="auth-form"><label class="field hidden" id="auth-name-wrap"><span>Your name</span><input id="auth-name" autocomplete="name" maxlength="80"></label><label class="field"><span>Email address</span><input id="auth-email" type="email" autocomplete="email" required></label><label class="field"><span>Password</span><input id="auth-password" type="password" autocomplete="current-password" minlength="10" required><small>At least 10 characters.</small></label><div class="form-error" id="auth-error" role="alert"></div><button class="btn btn-primary btn-block" id="auth-submit">Sign in <span>↗</span></button></form>
+<div class="auth-switch" id="auth-switch">New to StreetSense? <button id="switch-auth">Create an account</button></div></div></section></div>
+
+<div class="modal hidden" id="report-modal"><div class="modal-scrim" data-close></div><section class="report-card" role="dialog" aria-modal="true" aria-labelledby="report-title"><i class="hz"></i><button class="icon-btn close-x" data-close aria-label="Close"><svg class="i"><use href="/icons.svg#i-close"/></svg></button><div class="pad">
+<form id="report-form"><span class="kicker">Community field report</span><h2 id="report-title">What needs attention?</h2><p class="report-intro">Give the review team enough detail to find and understand the issue.</p>
+<div class="form-grid"><label class="field"><span>Issue category</span><select id="report-category" required><option value="">Choose a category</option><option>Pothole</option><option>Road crack</option><option>Road edge damage</option><option>Waterlogging</option><option>Damaged road marking</option><option>Damaged sign</option><option>Broken streetlight</option><option>Blocked drain</option><option>Other</option></select></label><label class="field"><span>Street / area</span><input id="report-location" maxlength="240" placeholder="e.g. Sector 14, main market road" required></label>
+<label class="field span-2"><span>What did you notice?</span><textarea id="report-description" rows="4" minlength="10" maxlength="2000" placeholder="Where exactly, how big, who it affects…" required></textarea></label>
+<label class="field span-2"><span>Photo (optional · JPG, PNG, WebP · max 8 MB)</span><input id="report-image" type="file" accept="image/jpeg,image/png,image/webp"><small style="display:block;margin-top:6px;opacity:.8">Tip: stand 2 to 3 metres back so the damage and the road around it are both in the photo. Close-ups and photos taken after rain can confuse the AI. A reviewer checks every report anyway.</small></label><div class="image-preview hidden span-2" id="image-preview"></div>
+<label class="field"><span>Latitude (optional)</span><input id="report-lat" type="number" step="any"></label><label class="field"><span>Longitude (optional)</span><input id="report-lng" type="number" step="any"></label>
+<div class="span-2"><button class="btn btn-sm" type="button" id="use-location">◎ Use my current location</button></div></div>
+<div class="form-error" id="report-error" role="alert"></div><button class="btn btn-primary btn-block" id="report-submit">Submit report <span>↗</span></button></form>
+<section id="ai-result" class="ai-result hidden" aria-live="polite"><span class="kicker">Analysis</span><h2>Report received.</h2><p id="ai-result-message">Your photo is being analysed.</p><div id="ai-result-details"></div><p class="ai-review-note">Automated predictions are preliminary and must be verified by the review team. They do not replace a human inspection.</p><button type="button" class="btn btn-ink btn-block" id="ai-result-close">Done</button></section>
+</div></section></div>
+
+<div class="modal hidden" id="mine-modal"><div class="modal-scrim" data-close></div><section class="report-card" role="dialog" aria-modal="true" aria-labelledby="mine-title"><i class="hz"></i><button class="icon-btn close-x" data-close aria-label="Close"><svg class="i"><use href="/icons.svg#i-close"/></svg></button><div class="pad"><span class="kicker">Your submissions</span><h2 id="mine-title">My reports</h2><div id="mine-list" class="mine-list"></div><button class="btn btn-block" id="mine-signout" style="margin-top:18px">Sign out</button></div></section></div>
+<div class="toast" id="toast" role="status"></div>
+<script src="/portal.js"></script>
+<script src="/status.js?v=9"></script>
+<script src="/notifications.js?v=1"></script>
+</body></html>

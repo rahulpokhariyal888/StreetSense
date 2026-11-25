@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StreetSense — Intelligence desk</title>
+<script>try{var t=localStorage.getItem('streetsense-theme-v1');if(t)document.documentElement.dataset.theme=t==='dark'?'dark':'light'}catch(e){}</script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="/insights.css?v=13"></head>
+<body>
+<header class="bar"><h1 class="brand">StreetSense · Intelligence desk</h1><div><span class="live" id="live">connecting…</span><a href="/scan.html">Scan an image</a><a href="/operations.html">Operations desk</a><a href="/admin.html">Staff sign-in</a><a href="/introduction.html">Introduction</a><a href="/transparency.html">Public portal ↗</a></div></header>
+<nav class="tabs" role="tablist" id="tabs">
+<button role="tab" data-v="heat" aria-selected="true">Heatmap &amp; risk</button><button role="tab" data-v="review">Review queue <span class="pill" id="rq-count">0</span></button><button role="tab" data-v="predict">Prediction</button><button role="tab" data-v="routes">Work orders &amp; routes</button><button role="tab" data-v="equity">Equity &amp; budget</button><button role="tab" data-v="verify">Repair verification</button><button role="tab" data-v="footage">Metrics &amp; footage</button><button role="tab" data-v="crew">Crew view</button></nav>
+<main>
+<div id="auth" class="card hide"><h2>Sign in to continue</h2><p class="mute">This page needs an administrator account. Sign-ins are kept across server restarts, but expire after 12 hours.</p><div class="row"><input id="a-em" type="email" placeholder="Admin email" autocomplete="username"><input id="a-pw" type="password" placeholder="Password" autocomplete="current-password"><button class="btn" id="a-go">Sign in</button></div><div class="mute" id="a-msg"></div></div>
+
+<section class="view on" id="v-heat">
+ <div class="grid g4" id="kpis"></div>
+ <div class="row"><label>Show <select id="f-type"><option value="">All asset types</option></select></label>
+ <label>Colour by <select id="f-metric"><option value="priority">Severity (priority score)</option><option value="predicted">Predicted priority (decay)</option></select></label>
+ <button class="btn alt" id="load-sample">Load sample Delhi dataset</button></div>
+ <div class="grid g2"><div id="map" class="map"></div><div class="card"><h2>Liability flags</h2><p class="mute">Open hazards that carry immediate legal or economic exposure.</p><div id="flags"></div></div></div>
+ <div class="card" style="margin-top:16px"><h2>Scored incidents</h2><p class="mute">Condition index 100 = perfect, 0 = failed (PCI-style bands). Based on defect type, extent and road speed, not on model confidence. Depth/width/speed are estimated unless recorded.</p><div class="tablewrap" id="table"></div></div>
+</section>
+
+<section class="view" id="v-review"><div class="card"><h2>Human review queue</h2><p class="mute">Nothing the AI finds becomes an incident, a work order or a public repair until a person confirms it. Uncertain detections come first. Confirming creates the work order with its repair deadline.</p><div class="mute" id="rq-mode"></div><div class="mute" id="rq-sum"></div>
+ <div class="row"><label>Confirm everything at or above <input id="rq-min" type="number" value="85" min="50" max="100" style="width:70px">%</label><button class="btn alt" id="rq-bulk">Confirm all above threshold</button><span class="mute" id="rq-msg"></span></div></div><div id="rq"></div></section>
+<section class="view" id="v-predict"><div class="card"><h2>Where roads are likely to fail next</h2><div id="wx"></div><p class="note" id="method"></p><div class="grid g2"><div class="tablewrap" id="pz"></div><div class="tablewrap" id="pi"></div></div></div></section>
+
+<section class="view" id="v-routes"><div class="card"><h2>Auto-generated daily routes</h2><p class="mute">Open defects with no active work order are grouped into crews of up to 5 stops, ordered nearest-first.</p>
+ <div class="row"><button class="btn" id="commit">Create work orders for these routes</button><span class="mute" id="commit-msg"></span></div></div>
+ <div class="grid g2" style="margin-top:16px"><div id="rmap" class="map"></div><div id="crews" class="grid"></div></div></section>
+
+<section class="view" id="v-equity"><div class="card"><h2>Equity &amp; budget</h2><div class="note">Zone population, income index, 311 call counts and base spend are <b>illustrative sample data</b>. Replace <code>ZONES</code> in insights.js with ward/census and finance data.</div>
+ <div id="corr"></div><div class="row"><label>Plan a repair budget (₹) <input id="budget" type="number" value="2000000" step="100000"></label><button class="btn alt" id="bgo">Allocate by need</button></div>
+ <div class="tablewrap" id="eq"></div></div>
+ <div class="card" style="margin-top:16px"><h2>Objective ROI</h2><div id="roi"></div></div></section>
+
+<section class="view" id="v-verify"><div class="card"><h2>Before &amp; after verification</h2><p class="mute">Upload a before and an after photo per work order. When both exist the order and its incident close automatically, with an audit entry.</p>
+ <div class="row"><select id="v-wo"></select><select id="v-kind"><option value="before">Before photo</option><option value="after">After photo</option></select><input type="file" id="v-file" accept="image/jpeg,image/png,image/webp"><input id="v-note" placeholder="Note (optional)"><button class="btn" id="v-go">Upload</button></div><div class="mute" id="v-msg"></div><div id="v-list"></div></div></section>
+
+<section class="view" id="v-footage">
+ <div class="grid g4" id="metrics"></div>
+ <div class="grid g3" id="pains" style="margin-top:16px"></div>
+ <div class="grid g2" style="margin-top:16px"><div class="card"><h2>Scan dashcam or phone footage</h2><p class="mute">Upload a video of a drive. YOLO checks a frame every few seconds, merges repeat sightings of the same defect, and creates incidents (with the flagged frame as evidence) and repair work orders with deadlines.</p>
+ <div class="row"><input type="file" id="vf" accept="video/*"></div>
+ <div class="row"><label>Start lat <input id="slat" size="9" placeholder="28.6315"></label><label>Start lng <input id="slng" size="9" placeholder="77.2167"></label><button class="btn alt" id="geo" type="button">Use my location</button></div>
+ <div class="row"><label>End lat <input id="elat" size="9" placeholder="optional"></label><label>End lng <input id="elng" size="9" placeholder="optional"></label></div>
+ <div class="row"><label>Check a frame every <select id="every"><option value="0.5">0.5 s</option><option value="1" selected>1 s</option><option value="2">2 s</option><option value="5">5 s</option></select></label><span class="mute">Detections wait in the Review queue; confirming one creates its work order.</span></div>
+ <div class="row"><button class="btn" id="vgo">Upload and scan</button><span class="mute" id="vmsg"></span></div><div class="bar-h" id="vbar" style="display:none"><i style="width:0"></i></div>
+ <p class="mute">With only a start point every defect is placed there. Add an end point and positions are spread along the route.</p></div>
+ <div class="card"><h2>Scans</h2><div id="jobs"></div></div></div>
+</section>
+<section class="view" id="v-crew"><div class="card"><h2>Crew view</h2><p class="mute">What a maintenance crew sees on a tablet: stops in order, exact GPS, materials and deadline. Upload the before/after photos in "Repair verification".</p><div class="row"><label>Crew <select id="crew-sel"></select></label></div><div id="crew-list"></div></div><div class="card" style="margin-top:16px"><h2>All work orders</h2><p class="mute">Every work order, assigned or not. Deleting one frees its incident for a new route.</p><div class="tablewrap" id="wo-all"></div></div></section>
+
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="/insights-ui.js?v=13"></script></body></html>

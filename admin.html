@@ -1,0 +1,494 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b2545">
+<title>StreetSense — Admin console</title>
+
+<script>
+try {
+  var t = localStorage.getItem('streetsense-theme-v1');
+  if (!t) t = 'light';
+  document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';
+} catch(e) {}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/ss-base.css">
+<link rel="stylesheet" href="/admin.css">
+</head>
+
+<body class="admin-page">
+
+<a class="skip-link" href="#admin-main">Skip to content</a>
+
+<header class="abar">
+  <a class="brand" href="/" aria-label="StreetSense">
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+      <use href="/icons.svg#i-logo"/>
+    </svg>
+    <span class="brand-name">StreetSense<small>Admin console</small></span>
+  </a>
+
+  <nav class="atabs" aria-label="Admin sections">
+    <button class="admin-nav active" data-panel="overview">
+      <svg class="i"><use href="/icons.svg#i-overview"/></svg>
+      <span>Overview</span>
+    </button>
+
+    <button class="admin-nav" data-panel="complaints">
+      <svg class="i"><use href="/icons.svg#i-inbox"/></svg>
+      <span>Complaints</span>
+      <em id="nav-complaints">00</em>
+    </button>
+    <button class="admin-nav" data-panel="duplicates">
+      <svg class="i"><use href="/icons.svg#i-inbox"/></svg>
+      <span>Duplicate Complaints</span>
+      <em id="nav-duplicates">00</em>
+    </button>
+    
+    <button class="admin-nav" data-panel="accounts">
+      <svg class="i"><use href="/icons.svg#i-users"/></svg>
+      <span>Accounts</span>
+    </button>
+
+    <button class="admin-nav" data-panel="verifications">
+      <span>Repair Verification</span>
+    </button>
+
+    <button class="admin-nav" data-panel="settings">
+      <svg class="i"><use href="/icons.svg#i-overview"/></svg>
+      <span>Settings</span>
+    </button>
+
+    <a class="admin-nav ops-link" href="/insights.html">
+      <svg class="i"><use href="/icons.svg#i-analytics"/></svg>
+      <span>Intelligence desk</span>
+    </a>
+
+    <a class="admin-nav ops-link" href="/operations.html">
+      <svg class="i"><use href="/icons.svg#i-map"/></svg>
+      <span>Operations desk</span>
+    </a>
+  </nav>
+
+  <div class="admin-user">
+    <span id="admin-email">Administrator</span>
+    <button class="btn btn-sm" id="admin-logout">Sign out</button>
+  </div>
+</header>
+
+<main class="admin-main" id="admin-main">
+
+<div class="admin-head">
+  <div>
+    <div class="sheet-tag">
+      <span class="plate">ADMIN</span>
+      <span class="kicker">Control room</span>
+    </div>
+    <h1 class="display" id="admin-heading">Overview</h1>
+  </div>
+</div>
+
+<div id="admin-login" class="admin-login hidden">
+  <div class="login-card">
+    <i class="hz"></i>
+    <div class="pad">
+      <span class="kicker">Restricted access</span>
+      <h2 id="admin-auth-title">Administrator sign in</h2>
+      <p id="admin-auth-copy">Access complaint review and account controls.</p>
+
+      <form id="admin-auth-form">
+        <label class="field hidden" id="setup-name-wrap">
+          <span>Administrator name</span>
+          <input id="setup-name" maxlength="80">
+        </label>
+
+        <label class="field">
+          <span>Email address</span>
+          <input id="admin-auth-email" type="email" autocomplete="username" required>
+        </label>
+
+        <label class="field">
+          <span>Password</span>
+          <input id="admin-auth-password" type="password" autocomplete="current-password" minlength="10" required>
+        </label>
+
+        <div class="form-error" id="admin-auth-error" role="alert"></div>
+        <button class="btn btn-primary btn-block" id="admin-auth-submit">Sign in</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="admin-content">
+
+<!-- OVERVIEW -->
+<section class="admin-panel active" id="panel-overview">
+
+  <div class="welcome">
+    <div>
+      <span class="kicker">Municipal operations</span>
+      <h2 class="display">Good work begins with good visibility.</h2>
+      <hr class="lane">
+      <p>Review community reports, promote verified ones to the incident register and keep the city moving.</p>
+    </div>
+    <a class="btn btn-primary" href="/operations.html">Open operations desk</a>
+  </div>
+
+  <div class="metric-grid">
+    <article>
+      <span>All complaints</span>
+      <b id="metric-total">0</b>
+      <small>Community submissions</small>
+    </article>
+
+    <article>
+      <span>Awaiting review</span>
+      <b id="metric-review" class="is-warn">0</b>
+      <small>Needs administrator action</small>
+    </article>
+
+    <article>
+      <span>In progress</span>
+      <b id="metric-progress">0</b>
+      <small>Being addressed</small>
+    </article>
+
+    <article>
+      <span>Resolved</span>
+      <b id="metric-resolved">0</b>
+      <small>Marked complete</small>
+    </article>
+  </div>
+
+  <div class="admin-lower">
+    <section class="admin-box">
+      <div class="box-head">
+        <div>
+          <span class="kicker">Latest activity</span>
+          <h3>Recent complaints</h3>
+        </div>
+        <button class="link-btn inline-action" data-go="complaints">View all</button>
+      </div>
+      <div id="recent-complaints" class="complaint-list"></div>
+    </section>
+
+    <section class="admin-box">
+      <div class="box-head">
+        <div>
+          <span class="kicker">Account directory</span>
+          <h3>People with access</h3>
+        </div>
+        <button class="link-btn inline-action" data-go="accounts">Manage</button>
+      </div>
+      <div id="recent-users" class="user-list"></div>
+    </section>
+  </div>
+</section>
+
+<!-- COMPLAINTS -->
+<section class="admin-panel" id="panel-complaints">
+
+  <div class="panel-intro">
+    <div>
+      <span class="kicker">Incoming · community reports</span>
+      <h2 class="display">Complaint register</h2>
+      <p>Open a complaint to review the photo, model suggestion and set its status.</p>
+    </div>
+    <button class="btn" id="refresh-complaints">
+      <svg class="i"><use href="/icons.svg#i-refresh"/></svg>
+      Refresh
+    </button>
+  </div>
+
+  <div class="filter-row">
+    <label class="search-field">
+      <svg class="i"><use href="/icons.svg#i-search"/></svg>
+      <input id="complaint-search" placeholder="Search ID, category, location or reporter" aria-label="Search complaints">
+    </label>
+
+    <select class="control" id="complaint-filter" aria-label="Filter by status">
+      <option value="">All statuses</option>
+      <option>Submitted</option>
+      <option>Under review</option>
+      <option>Assigned</option>
+      <option>In progress</option>
+      <option>Resolved</option>
+      <option>Rejected</option>
+    </select>
+  </div>
+
+  <div id="all-complaints" class="admin-complaints"></div>
+</section>
+<!-- DUPLICATE COMPLAINTS -->
+<section class="admin-panel" id="panel-duplicates">
+
+  <div class="panel-intro">
+    <div>
+      <span class="kicker">AI-assisted review</span>
+      <h2 class="display">Duplicate Complaints</h2>
+      <p>Review reports that may describe the same road issue.</p>
+    </div>
+
+    <button class="btn" id="refresh-duplicates">
+      <svg class="i"><use href="/icons.svg#i-refresh"/></svg>
+      Refresh
+    </button>
+  </div>
+
+  <div class="stats-grid">
+    <article class="stat-card">
+      <span>Pending reviews</span>
+      <strong id="duplicate-pending-count">0</strong>
+    </article>
+  </div>
+
+  <div id="duplicate-list" class="admin-complaints">
+    <p>Loading duplicate complaints...</p>
+  </div>
+
+</section>
+<!-- ACCOUNTS -->
+<section class="admin-panel" id="panel-accounts">
+
+  <div class="panel-intro">
+    <div>
+      <span class="kicker">Identity · access management</span>
+      <h2 class="display">Account directory</h2>
+      <p>Create citizen accounts and manage administrator access.</p>
+    </div>
+    <button class="btn btn-primary" id="create-user-open">
+      <svg class="i"><use href="/icons.svg#i-plus"/></svg>
+      Create account
+    </button>
+  </div>
+
+  <div class="account-note">
+    <b>Account security</b>
+    <span>Passwords are stored as salted one-way hashes. Share temporary credentials privately and ask people to change them after first sign-in.</span>
+  </div>
+
+  <div id="all-users" class="users-table"></div>
+</section>
+
+<!-- REPAIR VERIFICATION -->
+<section class="admin-panel" id="panel-verifications">
+
+  <div class="panel-intro">
+    <div>
+      <span class="kicker">Quality control · repair evidence</span>
+      <h2 class="display">Before &amp; After Verification</h2>
+      <p>Upload repair photos, inspect submitted evidence and review completed repair work.</p>
+    </div>
+
+    <button class="btn" id="refresh-verifications" type="button">
+      <svg class="i"><use href="/icons.svg#i-refresh"/></svg>
+      Refresh
+    </button>
+  </div>
+
+  <section class="admin-box" style="margin-bottom:20px">
+    <div class="box-head">
+      <div>
+        <span class="kicker">Field evidence</span>
+        <h3>Upload repair photos</h3>
+      </div>
+    </div>
+
+    <form id="verification-upload-form">
+
+      <label class="field">
+        <span>Work order</span>
+        <select id="verification-work-order" required>
+          <option value="">Loading work orders...</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Photo type</span>
+        <select id="verification-kind" required>
+          <option value="before_repair">Before repair</option>
+          <option value="after_repair">After repair</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Photo</span>
+        <input
+          id="verification-photo"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          required
+        >
+        <small>JPEG, PNG or WebP. Maximum size: 8 MB.</small>
+      </label>
+
+      <label class="field">
+        <span>Note (optional)</span>
+        <textarea
+          id="verification-note"
+          maxlength="1000"
+          rows="3"
+          placeholder="Describe the repair evidence..."
+        ></textarea>
+      </label>
+
+      <button class="btn btn-primary" type="submit" id="verification-upload-submit">
+        Upload evidence
+      </button>
+
+      <p id="verification-upload-message" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <section class="admin-box">
+    <div class="box-head">
+      <div>
+        <span class="kicker">Submitted evidence</span>
+        <h3>Verification queue</h3>
+      </div>
+    </div>
+
+    <div id="verification-list" aria-live="polite">
+      Loading verification records...
+    </div>
+  </section>
+</section>
+
+<!-- SETTINGS -->
+<section class="admin-panel" id="panel-settings">
+
+  <div class="panel-intro">
+    <div>
+      <span class="kicker">Control · approvals and data</span>
+      <h2 class="display">Settings</h2>
+      <p>Choose whether new reports are approved by a person or automatically, and clear the data when you want to start fresh.</p>
+    </div>
+  </div>
+
+  <div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+
+    <div style="background:var(--card);border:1px solid var(--rule);padding:18px;display:grid;gap:12px;align-content:start">
+      <h3 style="margin:0">Approval mode</h3>
+
+      <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start">
+        <input type="radio" name="approval" value="manual" checked>
+        <span>
+          <b>Manual approval</b> (recommended)<br>
+          <small>Every new citizen report waits for you. Press Approve to turn it into an incident with a repair order, or Reject it. AI detections wait in the review queue.</small>
+        </span>
+      </label>
+
+      <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start">
+        <input type="radio" name="approval" value="auto">
+        <span>
+          <b>Auto approval</b><br>
+          <small>New reports that have a map location are approved automatically, and so are AI detections at or above the confidence below. Each becomes an incident with a repair order. Everything else still waits for you.</small>
+        </span>
+      </label>
+
+      <label style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span>Auto-approve AI detections at or above</span>
+        <input id="auto-min" type="number" min="50" max="100" value="85" style="width:72px">
+        <span>% confidence</span>
+      </label>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-primary" id="save-approval" type="button">Save approval mode</button>
+        <span id="approval-msg" aria-live="polite"></span>
+      </div>
+
+      <hr style="border:0;border-top:1px solid var(--rule);width:100%">
+      <div id="wait-info">Loading…</div>
+      <div>
+        <button class="btn" id="approve-all" type="button">Approve all waiting reports</button>
+      </div>
+    </div>
+
+    <div style="background:var(--card);border:2px solid var(--crit);padding:18px;display:grid;gap:12px;align-content:start">
+      <h3 style="margin:0;color:var(--crit)">Danger zone: clear all data</h3>
+      <p style="margin:0">Deletes every citizen report, incident, work order, repair photo, footage scan and review result, plus all uploaded photos and videos.</p>
+      <p style="margin:0">
+        <small>Admin and citizen accounts are kept. A backup copy of the database is saved first in the <code>data/backups</code> folder (photos and videos are not backed up). This cannot be undone from the website.</small>
+      </p>
+      <div>
+        <button class="btn btn-danger" id="clear-data" type="button">Clear all data…</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div>
+</main>
+
+<!-- CREATE USER MODAL -->
+<div class="modal hidden" id="create-user-modal">
+  <div class="modal-scrim" data-close></div>
+  <section class="auth-card" role="dialog" aria-modal="true" aria-labelledby="cu-title">
+    <i class="hz"></i>
+    <button class="icon-btn close-x" data-close aria-label="Close">
+      <svg class="i"><use href="/icons.svg#i-close"/></svg>
+    </button>
+    <div class="pad">
+      <span class="kicker">New account</span>
+      <h2 id="cu-title">Create an account</h2>
+      <p>Set up a citizen or administrator login.</p>
+
+      <form id="create-user-form">
+        <label class="field">
+          <span>Full name</span>
+          <input id="new-user-name" maxlength="80" required>
+        </label>
+
+        <label class="field">
+          <span>Email address</span>
+          <input id="new-user-email" type="email" required>
+        </label>
+
+        <label class="field">
+          <span>Temporary password</span>
+          <div class="password-row">
+            <input id="new-user-password" minlength="10" required>
+            <button type="button" class="btn btn-sm" id="generate-password">Generate</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span>Account role</span>
+          <select id="new-user-role">
+            <option value="citizen">Citizen</option>
+            <option value="admin">Administrator</option>
+          </select>
+        </label>
+
+        <div class="form-error" id="create-user-error" role="alert"></div>
+        <button class="btn btn-primary btn-block">Create account</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+<!-- COMPLAINT DETAIL MODAL -->
+<div class="modal hidden" id="complaint-detail-modal">
+  <div class="modal-scrim" data-close></div>
+  <section class="report-card detail-card" role="dialog" aria-modal="true">
+    <i class="hz"></i>
+    <button class="icon-btn close-x" data-close aria-label="Close">
+      <svg class="i"><use href="/icons.svg#i-close"/></svg>
+    </button>
+    <div class="pad" id="complaint-detail"></div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="/admin.js"></script>
+<script src="/admin-verifications.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,380 @@
+'use strict';
+// StreetSense 4.2 local backend: Node.js HTTP + built-in SQLite (Node 22+).
+const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const { randomUUID } = require('node:crypto');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
+const execFileAsync = promisify(execFile);
+const { DatabaseSync } = require('node:sqlite');
+
+const ROOT = __dirname;
+const DATA_DIR = path.join(ROOT, 'data');
+const EVIDENCE_DIR = path.join(DATA_DIR, 'evidence');
+const MODEL_PATH = process.env.STREETSENSE_MODEL || path.join(ROOT, 'models', 'road_defects.pt');
+const VENV_PYTHON = process.platform === 'win32' ? path.join(ROOT, '.venv-ai', 'Scripts', 'python.exe') : path.join(ROOT, '.venv-ai', 'bin', 'python');
+const PYTHON = process.env.PYTHON || (fs.existsSync(VENV_PYTHON) ? VENV_PYTHON : (process.platform === 'win32' ? 'py' : 'python3'));
+fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
+const db = new DatabaseSync(path.join(DATA_DIR, 'streetsense.sqlite'));
+db.exec(`PRAGMA journal_mode = WAL;
+CREATE TABLE IF NOT EXISTS incidents (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS work_orders (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, action TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, created_at TEXT NOT NULL, details TEXT);
+CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS evidence (id TEXT PRIMARY KEY, filename TEXT NOT NULL, mime_type TEXT NOT NULL, stored_name TEXT NOT NULL, lat REAL, lng REAL, review_status TEXT NOT NULL, created_at TEXT NOT NULL);`);
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  display_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  password_salt TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('admin','citizen')),
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS complaints (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS complaints_user_idx ON complaints(user_id);
+`);
+
+
+const seedIncidents = [
+ {id:'SS-2048',type:'Pothole',severity:'Critical',location:'Lajpat Nagar II · Central Market Road',lat:28.5677,lng:77.2433,reported:'8 min ago',confidence:96.2,status:'Open',source:'Dashcam upload',description:'Large road-surface depression near a pedestrian crossing. Requires field verification and temporary barricading.',team:'Roads Unit 04',risk:94},
+ {id:'SS-2047',type:'Damaged sign',severity:'High',location:'Connaught Place · Block B',lat:28.6315,lng:77.2167,reported:'21 min ago',confidence:91.4,status:'Assigned',source:'Mobile photo',description:'Bent and partially obstructed directional sign. Visibility may be reduced for approaching drivers.',team:'Signage Team 02',risk:82},
+ {id:'SS-2046',type:'Broken streetlight',severity:'High',location:'Karol Bagh · Ajmal Khan Road',lat:28.6514,lng:77.1907,reported:'46 min ago',confidence:94.8,status:'In progress',source:'Field report',description:'Streetlight reported non-functional along a busy evening route. Electrical inspection required.',team:'Electrical Unit 01',risk:79},
+ {id:'SS-2045',type:'Road crack',severity:'Medium',location:'Saket · Press Enclave Road',lat:28.5245,lng:77.2066,reported:'1 hr ago',confidence:88.7,status:'Open',source:'Dashcam upload',description:'Linear surface cracking visible across part of the carriageway. Monitor for progression.',team:'Unassigned',risk:56},
+ {id:'SS-2044',type:'Pothole',severity:'Low',location:'India Gate · C-Hexagon',lat:28.6129,lng:77.2295,reported:'2 hr ago',confidence:86.1,status:'Resolved',source:'Mobile photo',description:'Small surface defect recorded for maintenance history. Repair marked complete in this sample.',team:'Roads Unit 03',risk:28}
+];
+const seedOrders = [
+ {id:'WO-8041',title:'Repair deep road-surface defect',incident:'SS-2048',location:'Lajpat Nagar II',priority:'Critical',status:'New',team:'Unassigned',due:'Today'},
+ {id:'WO-8040',title:'Replace damaged direction sign',incident:'SS-2047',location:'Connaught Place',priority:'High',status:'Assigned',team:'Signage Team 02',due:'Today'},
+ {id:'WO-8039',title:'Inspect streetlight circuit',incident:'SS-2046',location:'Karol Bagh',priority:'High',status:'In progress',team:'Electrical Unit 01',due:'Nov 04'},
+ {id:'WO-8038',title:'Assess road-surface cracking',incident:'SS-2045',location:'Saket',priority:'Medium',status:'New',team:'Unassigned',due:'Nov 05'},
+ {id:'WO-8037',title:'Patch minor surface damage',incident:'SS-2044',location:'India Gate',priority:'Low',status:'Resolved',team:'Roads Unit 03',due:'Complete'},
+ {id:'WO-8036',title:'Clear blocked drain inlet',incident:'SS-2039',location:'Greater Kailash',priority:'Medium',status:'In progress',team:'Drainage Unit 01',due:'Nov 04'},
+ {id:'WO-8035',title:'Review faded lane marking',incident:'SS-2035',location:'Minto Road',priority:'Low',status:'Assigned',team:'Road Marking 03',due:'Nov 06'},
+ {id:'WO-8034',title:'Secure loose utility cover',incident:'SS-2032',location:'Defence Colony',priority:'High',status:'Resolved',team:'Roads Unit 02',due:'Complete'}
+];
+const count = db.prepare('SELECT COUNT(*) AS n FROM incidents').get().n;
+if (!count) saveSnapshot(seedIncidents, seedOrders, false);
+
+function saveSnapshot(incidents, orders, audit = true) {
+  const insertI = db.prepare('INSERT OR REPLACE INTO incidents(id,data,updated_at) VALUES(?,?,?)');
+  const insertW = db.prepare('INSERT OR REPLACE INTO work_orders(id,data,updated_at) VALUES(?,?,?)');
+  const now = new Date().toISOString();
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec('DELETE FROM incidents; DELETE FROM work_orders;');
+    for (const x of incidents) insertI.run(x.id, JSON.stringify(x), now);
+    for (const x of orders) insertW.run(x.id, JSON.stringify(x), now);
+    db.prepare("INSERT OR REPLACE INTO app_meta(key,value) VALUES('last_updated',?)").run(now);
+    if (audit) db.prepare('INSERT INTO audit_log VALUES(?,?,?,?,?,?)').run(randomUUID(),'snapshot_saved','workspace','all',now,JSON.stringify({incidents:incidents.length,workOrders:orders.length}));
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+function readRows(table) { return db.prepare(`SELECT data FROM ${table} ORDER BY updated_at DESC, rowid ASC`).all().map(r => JSON.parse(r.data)); }
+function json(res, status, payload) { const body = JSON.stringify(payload); res.writeHead(status, {'Content-Type':'application/json; charset=utf-8','Content-Length':Buffer.byteLength(body),'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}); res.end(body); }
+function audit(action, type, id, details = {}) { db.prepare('INSERT INTO audit_log VALUES(?,?,?,?,?,?)').run(randomUUID(),action,type,id,new Date().toISOString(),JSON.stringify(details)); }
+async function bodyJson(req) {
+  let raw=''; for await (const chunk of req) { raw += chunk; if (raw.length > 12_000_000) throw new Error('Request body exceeds 12 MB'); }
+  return raw ? JSON.parse(raw) : {};
+}
+function validIncident(x) {
+  return x && typeof x === 'object' && typeof x.id === 'string' && /^SS-[A-Za-z0-9-]{2,32}$/.test(x.id) &&
+    ['Pothole','Damaged sign','Broken streetlight','Road crack','Blocked drain','Other'].includes(x.type) &&
+    ['Critical','High','Medium','Low'].includes(x.severity) && typeof x.location === 'string' && x.location.trim().length > 0 && x.location.length <= 240 &&
+    ['Open','Assigned','In progress','Resolved'].includes(x.status) && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) &&
+    Number(x.lat) >= -90 && Number(x.lat) <= 90 && Number(x.lng) >= -180 && Number(x.lng) <= 180;
+}
+function validOrder(x) { return x && typeof x === 'object' && typeof x.id === 'string' && /^WO-[A-Za-z0-9-]{2,32}$/.test(x.id) && typeof x.incident === 'string' && typeof x.title === 'string' && ['New','Assigned','In progress','Resolved'].includes(x.status) && ['Critical','High','Medium','Low'].includes(x.priority); }
+async function runYolo(imagePath) {
+  if (!fs.existsSync(MODEL_PATH)) return { status: 'model_not_configured', detections: [] };
+  try {
+    const script = path.join(ROOT, 'ai', 'infer.py');
+    const args = PYTHON === 'py' ? ['-3', script, '--weights', MODEL_PATH, '--image', imagePath] : [script, '--weights', MODEL_PATH, '--image', imagePath];
+    const { stdout } = await execFileAsync(PYTHON, args, { cwd: ROOT, timeout: 90000, maxBuffer: 2 * 1024 * 1024, windowsHide: true });
+    const result = JSON.parse(stdout.trim());
+    return result.ok ? result : { status: result.status || 'inference_error', message: result.message || 'YOLO inference failed.', detections: [] };
+  } catch (error) {
+    return { status: error.killed ? 'inference_timeout' : 'inference_unavailable', message: String(error.message || error).slice(0, 300), detections: [] };
+  }
+}
+function classifyYolo(detections) {
+  const d = detections?.[0]; if (!d) return null;
+  const n = String(d.className).toLowerCase().replace(/[_-]+/g, ' ');
+  let type = 'Other';
+  // RDD2022 class-code mapping (keep codes that are not in the UI taxonomy as Other).
+  if (/^d40$/.test(n) || /pothole|hole/.test(n)) type = 'Pothole';
+  else if (/^(d00|d01|d10|d11|d20)$/.test(n) || /crack|alligator|rut|surface defect/.test(n)) type = 'Road crack';
+  else if (/sign/.test(n)) type = 'Damaged sign';
+  else if (/light|lamp/.test(n)) type = 'Broken streetlight';
+  else if (/drain|utility cover/.test(n)) type = 'Blocked drain';
+  // D0w0 (questionable/error label), D43 (crosswalk corruption), D44 (white-line
+  // corruption), and D50 (manhole-cover damage) stay Other in the current UI taxonomy.
+  return { type, confidence: d.confidence, className: d.className };
+}
+
+function mime(file) { return ({'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon'})[path.extname(file).toLowerCase()] || 'application/octet-stream'; }
+
+
+// Account security: scrypt password hashes and short-lived in-memory sessions.
+// The AI training scripts, datasets, model files and Python environment are not modified.
+const { scryptSync, randomBytes, timingSafeEqual } = require('node:crypto');
+const sessions = new Map();
+const SESSION_TTL = 12 * 60 * 60 * 1000;
+function normalizeEmail(value) { return String(value || '').trim().toLowerCase(); }
+function passwordRecord(password) {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(String(password), salt, 64).toString('hex');
+  return { salt, hash };
+}
+function verifyPassword(password, salt, hash) {
+  try {
+    const actual = scryptSync(String(password), salt, 64);
+    const expected = Buffer.from(hash, 'hex');
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  } catch (_) { return false; }
+}
+function sessionUser(req) {
+  const raw = String(req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('ss_session='));
+  if (!raw) return null;
+  const token = decodeURIComponent(raw.slice('ss_session='.length));
+  const session = sessions.get(token);
+  if (!session || session.expiresAt < Date.now()) { sessions.delete(token); return null; }
+  const user = db.prepare('SELECT id,email,display_name AS displayName,role,active,created_at AS createdAt FROM users WHERE id=?').get(session.userId);
+  if (!user || !user.active) { sessions.delete(token); return null; }
+  return user;
+}
+function setSession(res, userId) {
+  const token = randomBytes(32).toString('hex');
+  sessions.set(token, { userId, expiresAt: Date.now() + SESSION_TTL });
+  res.setHeader('Set-Cookie', `ss_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${Math.floor(SESSION_TTL/1000)}`);
+}
+function clearSession(req, res) {
+  const raw = String(req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('ss_session='));
+  if (raw) sessions.delete(decodeURIComponent(raw.slice('ss_session='.length)));
+  res.setHeader('Set-Cookie', 'ss_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+}
+function publicUser(user) {
+  return { id:user.id, email:user.email, displayName:user.display_name, role:user.role, active:Boolean(user.active), createdAt:user.created_at };
+}
+function validPassword(p) { return typeof p === 'string' && p.length >= 10 && p.length <= 128; }
+function safeComplaint(row) { return JSON.parse(row.data); }
+
+const server = http.createServer(async (req,res) => {
+  res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('X-Frame-Options','SAMEORIGIN'); res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`); const p = decodeURIComponent(url.pathname);
+  try {
+    if (p.startsWith('/api/')) {
+
+      // Public authentication bootstrap: the first account created becomes the initial administrator.
+      if (req.method === 'GET' && p === '/api/auth/status') {
+        const count = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+        return json(res,200,{setupRequired:count===0});
+      }
+      if (req.method === 'POST' && p === '/api/auth/setup') {
+        if (db.prepare('SELECT COUNT(*) AS n FROM users').get().n !== 0) return json(res,409,{error:'Administrator setup has already been completed.'});
+        const data = await bodyJson(req), email = normalizeEmail(data.email), name = String(data.name||'').trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !name || name.length>80 || !validPassword(data.password)) return json(res,400,{error:'Enter a valid name, email and password (at least 10 characters).'});
+        const pw = passwordRecord(data.password), id = randomUUID(), now = new Date().toISOString();
+        db.prepare('INSERT INTO users(id,email,display_name,password_hash,password_salt,role,active,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id,email,name,pw.hash,pw.salt,'admin',1,now);
+        setSession(res,id);
+        audit('administrator_created','user',id,{email});
+        return json(res,201,{user:{id,email,displayName:name,role:'admin',active:true,createdAt:now}});
+      }
+      if (req.method === 'POST' && p === '/api/auth/register') {
+        if (db.prepare('SELECT COUNT(*) AS n FROM users').get().n === 0) return json(res,403,{error:'Administrator setup must be completed from /admin.html before citizen registration.'});
+        const data = await bodyJson(req), email = normalizeEmail(data.email), name = String(data.name||'').trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !name || name.length>80 || !validPassword(data.password)) return json(res,400,{error:'Enter a valid name, email and password (at least 10 characters).'});
+        const pw = passwordRecord(data.password), id = randomUUID(), now = new Date().toISOString();
+        try { db.prepare('INSERT INTO users(id,email,display_name,password_hash,password_salt,role,active,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id,email,name,pw.hash,pw.salt,'citizen',1,now); }
+        catch (_) { return json(res,409,{error:'An account with this email already exists.'}); }
+        setSession(res,id);
+        audit('citizen_registered','user',id,{email});
+        return json(res,201,{user:{id,email,displayName:name,role:'citizen',active:true,createdAt:now}});
+      }
+      if (req.method === 'POST' && p === '/api/auth/login') {
+        const data = await bodyJson(req), email = normalizeEmail(data.email);
+        const user = db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE').get(email);
+        if (!user || !user.active || !verifyPassword(data.password || '',user.password_salt,user.password_hash)) return json(res,401,{error:'Email or password is incorrect.'});
+        setSession(res,user.id);
+        audit('user_login','user',user.id,{});
+        return json(res,200,{user:{id:user.id,email:user.email,displayName:user.display_name,role:user.role,active:true,createdAt:user.created_at}});
+      }
+      if (req.method === 'POST' && p === '/api/auth/logout') { clearSession(req,res); return json(res,200,{ok:true}); }
+      if (req.method === 'GET' && p === '/api/auth/me') {
+        const user = sessionUser(req);
+        return json(res,200,{user:user?{id:user.id,email:user.email,displayName:user.displayName,role:user.role,active:true,createdAt:user.createdAt}:null,setupRequired:db.prepare('SELECT COUNT(*) AS n FROM users').get().n===0});
+      }
+
+      const currentUser = sessionUser(req);
+      if (req.method === 'GET' && p === '/api/users') {
+        if (!currentUser || currentUser.role !== 'admin') return json(res,403,{error:'Administrator access required.'});
+        const users = db.prepare('SELECT id,email,display_name AS displayName,role,active,created_at AS createdAt FROM users ORDER BY created_at DESC').all();
+        return json(res,200,{items:users.map(u=>({...u,active:Boolean(u.active)}))});
+      }
+      if (req.method === 'POST' && p === '/api/users') {
+        if (!currentUser || currentUser.role !== 'admin') return json(res,403,{error:'Administrator access required.'});
+        const data=await bodyJson(req), email=normalizeEmail(data.email), name=String(data.name||'').trim(), role=data.role==='admin'?'admin':'citizen';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !name || name.length>80 || !validPassword(data.password)) return json(res,400,{error:'Enter a valid name, email and temporary password (at least 10 characters).'});
+        const pw=passwordRecord(data.password), id=randomUUID(), now=new Date().toISOString();
+        try { db.prepare('INSERT INTO users(id,email,display_name,password_hash,password_salt,role,active,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id,email,name,pw.hash,pw.salt,role,1,now); }
+        catch (_) { return json(res,409,{error:'An account with this email already exists.'}); }
+        audit('account_created','user',id,{email,role,by:currentUser.id});
+        return json(res,201,{user:{id,email,displayName:name,role,active:true,createdAt:now}});
+      }
+      const userMatch=p.match(/^\/api\/users\/([^/]+)$/);
+      if (userMatch && req.method === 'PATCH') {
+        if (!currentUser || currentUser.role !== 'admin') return json(res,403,{error:'Administrator access required.'});
+        const target=db.prepare('SELECT * FROM users WHERE id=?').get(userMatch[1]);
+        if (!target) return json(res,404,{error:'Account not found.'});
+        const data=await bodyJson(req);
+        if (target.id===currentUser.id && data.active===false) return json(res,400,{error:'You cannot deactivate your own administrator account.'});
+        if (data.password !== undefined && !validPassword(data.password)) return json(res,400,{error:'Temporary password must contain at least 10 characters.'});
+        if (data.password !== undefined) { const pw=passwordRecord(data.password); db.prepare('UPDATE users SET password_hash=?,password_salt=? WHERE id=?').run(pw.hash,pw.salt,target.id); }
+        if (data.active !== undefined) db.prepare('UPDATE users SET active=? WHERE id=?').run(data.active?1:0,target.id);
+        if (data.role === 'admin' || data.role === 'citizen') db.prepare('UPDATE users SET role=? WHERE id=?').run(data.role,target.id);
+        audit('account_updated','user',target.id,{by:currentUser.id});
+        const updated=db.prepare('SELECT id,email,display_name AS displayName,role,active,created_at AS createdAt FROM users WHERE id=?').get(target.id);
+        return json(res,200,{user:{...updated,active:Boolean(updated.active)}});
+      }
+
+      if (req.method === 'POST' && p === '/api/complaints') {
+        if (!currentUser) return json(res,401,{error:'Please sign in to submit a complaint.'});
+        const data=await bodyJson(req);
+        const category=String(data.category||'').trim(), location=String(data.location||'').trim(), description=String(data.description||'').trim();
+        const lat = data.lat === null || data.lat === undefined || data.lat === '' ? null : Number(data.lat);
+        const lng = data.lng === null || data.lng === undefined || data.lng === '' ? null : Number(data.lng);
+        if (!category || category.length>80 || !location || location.length>240 || description.length<10 || description.length>2000) return json(res,400,{error:'Add a category, location and description of at least 10 characters.'});
+        if ((lat === null) !== (lng === null) || (lat !== null && (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180))) return json(res,400,{error:'Enter valid latitude and longitude coordinates.'});
+        const id='SS-'+randomBytes(4).toString('hex').toUpperCase(), now=new Date().toISOString();
+        let imageName=null;
+        if (data.image && typeof data.image.base64==='string') {
+          const allowed={'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp'}, ext=allowed[data.image.mimeType];
+          if (!ext) return json(res,400,{error:'Use a JPG, PNG or WebP photo.'});
+          const buffer=Buffer.from(data.image.base64,'base64');
+          if (!buffer.length || buffer.length>8*1024*1024) return json(res,400,{error:'Photo must be 8 MB or smaller.'});
+          imageName=randomUUID()+ext;
+          fs.writeFileSync(path.join(EVIDENCE_DIR,imageName),buffer,{flag:'wx'});
+        }
+        const complaint={id,category,location,lat,lng,description,status:'Submitted',priority:'Awaiting review',image:imageName?`/api/complaint-image/${imageName}`:null,reporter:{id:currentUser.id,email:currentUser.email,name:currentUser.displayName},createdAt:now,updatedAt:now,adminNote:''};
+        db.prepare('INSERT INTO complaints(id,user_id,data,created_at,updated_at) VALUES(?,?,?,?,?)').run(id,currentUser.id,JSON.stringify(complaint),now,now);
+        audit('citizen_complaint_submitted','complaint',id,{category,userId:currentUser.id});
+        return json(res,201,{item:complaint});
+      }
+      if (req.method === 'GET' && p === '/api/complaints') {
+        if (!currentUser) return json(res,401,{error:'Please sign in.'});
+        const rows=currentUser.role==='admin'
+          ? db.prepare('SELECT data FROM complaints ORDER BY created_at DESC').all()
+          : db.prepare('SELECT data FROM complaints WHERE user_id=? ORDER BY created_at DESC').all(currentUser.id);
+        return json(res,200,{items:rows.map(safeComplaint)});
+      }
+      if (req.method === 'GET' && p === '/api/admin/complaints') {
+        if (!currentUser || currentUser.role!=='admin') return json(res,403,{error:'Administrator access required.'});
+        return json(res,200,{items:db.prepare('SELECT data FROM complaints ORDER BY created_at DESC').all().map(safeComplaint)});
+      }
+      const complaintMatch=p.match(/^\/api\/admin\/complaints\/([^/]+)$/);
+      if (complaintMatch && req.method==='PATCH') {
+        if (!currentUser || currentUser.role!=='admin') return json(res,403,{error:'Administrator access required.'});
+        const row=db.prepare('SELECT data,user_id FROM complaints WHERE id=?').get(complaintMatch[1]);
+        if (!row) return json(res,404,{error:'Complaint not found.'});
+        const item=JSON.parse(row.data), data=await bodyJson(req);
+        const statuses=['Submitted','Under review','Assigned','In progress','Resolved','Rejected'];
+        if (data.status && !statuses.includes(data.status)) return json(res,400,{error:'Invalid complaint status.'});
+        if (data.status) item.status=data.status;
+        if (data.adminNote !== undefined) item.adminNote=String(data.adminNote).slice(0,1000);
+        item.updatedAt=new Date().toISOString();
+        db.prepare('UPDATE complaints SET data=?,updated_at=? WHERE id=?').run(JSON.stringify(item),item.updatedAt,item.id);
+        audit('complaint_updated','complaint',item.id,{status:item.status,by:currentUser.id});
+        return json(res,200,{item});
+      }
+      const imageMatch=p.match(/^\/api\/complaint-image\/([a-f0-9-]+\.(?:jpg|png|webp))$/i);
+      if (imageMatch && req.method==='GET') {
+        if (!currentUser) return json(res,401,{error:'Sign in required.'});
+        const imagePath=path.join(EVIDENCE_DIR,path.basename(imageMatch[1]));
+        const row=db.prepare('SELECT user_id,data FROM complaints WHERE data LIKE ?').get(`%${imageMatch[1]}%`);
+        if (!row || (currentUser.role!=='admin' && row.user_id!==currentUser.id) || !fs.existsSync(imagePath)) return json(res,404,{error:'Image not found.'});
+        const ext=path.extname(imagePath), type=({'.jpg':'image/jpeg','.png':'image/png','.webp':'image/webp'})[ext];
+        res.writeHead(200,{'Content-Type':type,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff'});
+        return fs.createReadStream(imagePath).pipe(res);
+      }
+
+      // Existing operations APIs are restricted to administrators.
+      if (p !== '/api/health' && p.startsWith('/api/')) {
+        if (!currentUser) return json(res,401,{error:'Sign in required.'});
+        if (currentUser.role !== 'admin') return json(res,403,{error:'Administrator access required.'});
+      }
+      if (req.method === 'GET' && p === '/api/health') return json(res,200,{ok:true,service:'StreetSense API',database:'SQLite',mode:'local-city operations',evidenceStorage:true,aiModel:fs.existsSync(MODEL_PATH)?'yolo-weights-present':'not-configured',time:new Date().toISOString()});
+      if (req.method === 'GET' && p === '/api/snapshot') return json(res,200,{incidents:readRows('incidents'),workOrders:readRows('work_orders'),lastUpdated:db.prepare("SELECT value FROM app_meta WHERE key='last_updated'").get()?.value || null});
+      if (req.method === 'PUT' && p === '/api/snapshot') {
+        const data=await bodyJson(req); const incidents=data.incidents, orders=data.workOrders;
+        if (!Array.isArray(incidents)||!Array.isArray(orders)||incidents.length>5000||orders.length>5000||!incidents.every(validIncident)||!orders.every(validOrder)) return json(res,400,{error:'Invalid workspace data. Check incident and work-order fields.'});
+        saveSnapshot(incidents,orders,true); return json(res,200,{ok:true,savedAt:new Date().toISOString(),incidents:incidents.length,workOrders:orders.length});
+      }
+      if (req.method === 'POST' && p === '/api/evidence') {
+        const data = await bodyJson(req);
+        const allowed = new Set(['image/jpeg','image/png','image/webp']);
+        if (!data || typeof data.filename !== 'string' || data.filename.length > 180 || !allowed.has(data.mimeType) || typeof data.base64 !== 'string') return json(res,400,{error:'Upload a JPG, PNG, or WebP image.'});
+        const buffer = Buffer.from(data.base64, 'base64');
+        if (!buffer.length || buffer.length > 8*1024*1024 || buffer.toString('base64').replace(/=+$/,'') !== data.base64.replace(/=+$/,'')) return json(res,400,{error:'Evidence must be a valid image up to 8 MB.'});
+        const id = randomUUID(); const ext = ({'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp'})[data.mimeType]; const storedName = `${id}${ext}`;
+        fs.writeFileSync(path.join(EVIDENCE_DIR, storedName), buffer, {flag:'wx'});
+        const lat = Number.isFinite(Number(data.lat)) && data.lat !== null ? Number(data.lat) : null;
+        const lng = Number.isFinite(Number(data.lng)) && data.lng !== null ? Number(data.lng) : null;
+        if ((lat === null) !== (lng === null) || (lat !== null && (lat < -90 || lat > 90 || lng < -180 || lng > 180))) { fs.unlinkSync(path.join(EVIDENCE_DIR, storedName)); return json(res,400,{error:'Invalid GPS coordinates.'}); }
+        const now = new Date().toISOString();
+        db.prepare('INSERT INTO evidence VALUES(?,?,?,?,?,?,?,?)').run(id,path.basename(data.filename),data.mimeType,storedName,lat,lng,'pending_human_review',now);
+        audit('evidence_uploaded','evidence',id,{filename:path.basename(data.filename),hasGps:lat!==null});
+        const analysis = await runYolo(path.join(EVIDENCE_DIR, storedName));
+        const prediction = analysis.status === 'inference_complete' ? classifyYolo(analysis.detections) : null;
+        if (prediction) audit('yolo_inference_completed','evidence',id,{type:prediction.type,confidence:prediction.confidence});
+        return json(res,201,{id,filename:path.basename(data.filename),lat,lng,reviewStatus:'pending_human_review',createdAt:now,modelStatus:analysis.status,analysis:{status:analysis.status,model:analysis.model||null,detections:analysis.detections||[],prediction,message:analysis.message||null}});
+      }
+      if (req.method === 'GET' && p === '/api/evidence') return json(res,200,{items:db.prepare('SELECT id,filename,mime_type AS mimeType,lat,lng,review_status AS reviewStatus,created_at AS createdAt FROM evidence ORDER BY created_at DESC LIMIT 100').all()});
+      if (req.method === 'GET' && p === '/api/incidents') return json(res,200,{items:readRows('incidents')});
+      if (req.method === 'POST' && p === '/api/incidents') {
+        const x=await bodyJson(req); if(!validIncident(x)) return json(res,400,{error:'Invalid incident payload'});
+        const now=new Date().toISOString(); db.prepare('INSERT INTO incidents VALUES(?,?,?)').run(x.id,JSON.stringify(x),now); audit('incident_created','incident',x.id,{source:x.source}); return json(res,201,{item:x});
+      }
+      const incidentMatch=p.match(/^\/api\/incidents\/([^/]+)$/);
+      if (incidentMatch && req.method === 'PATCH') {
+        const id=incidentMatch[1], old=db.prepare('SELECT data FROM incidents WHERE id=?').get(id); if(!old) return json(res,404,{error:'Incident not found'});
+        const next={...JSON.parse(old.data),...(await bodyJson(req))}; if(!validIncident(next)) return json(res,400,{error:'Invalid incident update'});
+        db.prepare('UPDATE incidents SET data=?,updated_at=? WHERE id=?').run(JSON.stringify(next),new Date().toISOString(),id); audit('incident_updated','incident',id); return json(res,200,{item:next});
+      }
+      if (req.method === 'GET' && p === '/api/work-orders') return json(res,200,{items:readRows('work_orders')});
+      if (req.method === 'POST' && p === '/api/work-orders') {
+        const x=await bodyJson(req); if(!validOrder(x)) return json(res,400,{error:'Invalid work-order payload'});
+        const now=new Date().toISOString(); db.prepare('INSERT INTO work_orders VALUES(?,?,?)').run(x.id,JSON.stringify(x),now); audit('work_order_created','work_order',x.id,{incident:x.incident}); return json(res,201,{item:x});
+      }
+      const orderMatch=p.match(/^\/api\/work-orders\/([^/]+)$/);
+      if (orderMatch && req.method === 'PATCH') {
+        const id=orderMatch[1], old=db.prepare('SELECT data FROM work_orders WHERE id=?').get(id); if(!old) return json(res,404,{error:'Work order not found'});
+        const next={...JSON.parse(old.data),...(await bodyJson(req))}; if(!validOrder(next)) return json(res,400,{error:'Invalid work-order update'});
+        db.prepare('UPDATE work_orders SET data=?,updated_at=? WHERE id=?').run(JSON.stringify(next),new Date().toISOString(),id); audit('work_order_updated','work_order',id,{status:next.status}); return json(res,200,{item:next});
+      }
+      if (req.method === 'GET' && p === '/api/analytics') {
+        const items=readRows('incidents'); const counts={}; for(const x of items) counts[x.type]=(counts[x.type]||0)+1;
+        return json(res,200,{total:items.length,open:items.filter(x=>x.status!=='Resolved').length,critical:items.filter(x=>x.severity==='Critical'&&x.status!=='Resolved').length,resolved:items.filter(x=>x.status==='Resolved').length,byType:counts});
+      }
+      if (req.method === 'GET' && p === '/api/audit') return json(res,200,{items:db.prepare('SELECT action,entity_type AS entityType,entity_id AS entityId,created_at AS createdAt,details FROM audit_log ORDER BY created_at DESC LIMIT 100').all().map(x=>({...x,details:x.details?JSON.parse(x.details):{}}))});
+      return json(res,404,{error:'API route not found'});
+    }
+    if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end('Method Not Allowed'); }
+    let target = p === '/' ? '/index.html' : p; const file = path.resolve(ROOT, `.${target}`);
+    if (!file.startsWith(ROOT + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end('Not Found'); }
+    res.writeHead(200,{'Content-Type':mime(file),'Cache-Control':path.extname(file)==='.html'?'no-cache':'public, max-age=3600'});
+    if(req.method==='HEAD') return res.end(); fs.createReadStream(file).pipe(res);
+  } catch (err) { console.error(err); json(res,400,{error:err instanceof SyntaxError?'Malformed JSON':err.message||'Request failed'}); }
+});
+const PORT=Number(process.env.PORT)||8000; server.listen(PORT,'127.0.0.1',()=>console.log(`StreetSense 4.2 running at http://localhost:${PORT}\nSQLite database: ${path.join(DATA_DIR,'streetsense.sqlite')}`));
+process.on('SIGINT',()=>{db.close();server.close(()=>process.exit(0));});

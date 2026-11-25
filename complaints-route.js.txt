@@ -1,0 +1,195 @@
+      // CITIZEN COMPLAINT SUBMISSION WITH AUTOMATIC EXIF GPS GEOTAGGING
+      if (req.method === 'POST' && p === '/api/complaints') {
+        if (!currentUser) {
+          return json(res, 401, { error: 'Please sign in to submit a complaint.' });
+        }
+
+        const data = await bodyJson(req);
+        const category = String(data.category || '').trim();
+        const location = String(data.location || '').trim();
+        const description = String(data.description || '').trim();
+
+        let lat = data.lat === null || data.lat === undefined || data.lat === ''
+          ? null : Number(data.lat);
+        let lng = data.lng === null || data.lng === undefined || data.lng === ''
+          ? null : Number(data.lng);
+
+        if (!category || category.length > 80 || !location || location.length > 240 ||
+            description.length < 10 || description.length > 2000) {
+          return json(res, 400, {
+            error: 'Add a category, location and description of at least 10 characters.'
+          });
+        }
+
+        const id = 'SS-' + randomBytes(4).toString('hex').toUpperCase();
+        const now = new Date().toISOString();
+        let imageName = null;
+        let gpsSource = 'not_available';
+
+        if (data.image && typeof data.image.base64 === 'string') {
+          const allowed = {
+            'image/jpeg': '.jpg',
+            'image/png': '.png',
+            'image/webp': '.webp'
+          };
+          const mimeType = String(data.image.mimeType || '').toLowerCase();
+          const ext = allowed[mimeType];
+
+          if (!ext) {
+            return json(res, 400, { error: 'Use a JPG, PNG or WebP photo.' });
+          }
+
+          let base64 = data.image.base64.trim();
+          base64 = base64.replace(/^data:image\\/(?:jpeg|jpg|png|webp);base64,/i, '');
+
+          if (!base64 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64) || base64.length % 4 === 1) {
+            return json(res, 400, { error: 'Invalid image data.' });
+          }
+
+          const buffer = Buffer.from(base64, 'base64');
+          if (!buffer.length || buffer.length > 8 * 1024 * 1024 ||
+              buffer.toString('base64').replace(/=+$/, '') !== base64.replace(/=+$/, '')) {
+            return json(res, 400, { error: 'Photo must be a valid image of 8 MB or smaller.' });
+          }
+
+          const isJpeg = buffer.length >= 3 &&
+            buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+          const isPng = buffer.length >= 8 &&
+            buffer.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+          const isWebp = buffer.length >= 12 &&
+            buffer.toString('ascii', 0, 4) === 'RIFF' &&
+            buffer.toString('ascii', 8, 12) === 'WEBP';
+
+          if ((mimeType === 'image/jpeg' && !isJpeg) ||
+              (mimeType === 'image/png' && !isPng) ||
+              (mimeType === 'image/webp' && !isWebp)) {
+            return json(res, 400, {
+              error: 'The uploaded image does not match its file type.'
+            });
+          }
+
+          console.log('[GEOTAG] Image received:', {
+            mimeType, bufferSize: buffer.length, initialLat: lat, initialLng: lng
+          });
+
+          if (lat !== null && lng !== null) {
+            gpsSource = 'manually_entered';
+            console.log('[GEOTAG] Using manually entered coordinates:', { lat, lng });
+          } else if (lat === null && lng === null) {
+            try {
+              const embeddedGps = extractImageGps(buffer, mimeType);
+              console.log('[GEOTAG] Extracted GPS:', embeddedGps);
+
+              if (embeddedGps &&
+                  Number.isFinite(embeddedGps.lat) &&
+                  Number.isFinite(embeddedGps.lng) &&
+                  embeddedGps.lat >= -90 && embeddedGps.lat <= 90 &&
+                  embeddedGps.lng >= -180 && embeddedGps.lng <= 180) {
+                lat = embeddedGps.lat;
+                lng = embeddedGps.lng;
+                gpsSource = 'image_exif';
+                console.log('[GEOTAG] GPS coordinates successfully applied:', { lat, lng });
+              } else {
+                console.log('[GEOTAG] No usable GPS coordinates found in image.');
+              }
+            } catch (gpsError) {
+              console.error('[GEOTAG] GPS extraction failed:', gpsError.message);
+            }
+          } else {
+            return json(res, 400, {
+              error: 'Enter both latitude and longitude, or leave both empty to use image GPS.'
+            });
+          }
+
+          if ((lat === null) !== (lng === null) ||
+              (lat !== null && (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+               lat < -90 || lat > 90 || lng < -180 || lng > 180))) {
+            return json(res, 400, { error: 'Enter valid latitude and longitude coordinates.' });
+          }
+
+          imageName = randomUUID() + ext;
+          fs.writeFileSync(path.join(EVIDENCE_DIR, imageName), buffer, { flag: 'wx' });
+        }
+
+        if ((lat === null) !== (lng === null) ||
+            (lat !== null && (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+             lat < -90 || lat > 90 || lng < -180 || lng > 180))) {
+          if (imageName) {
+            try { fs.rmSync(path.join(EVIDENCE_DIR, imageName), { force: true }); } catch (_) {}
+          }
+          return json(res, 400, { error: 'Enter valid latitude and longitude coordinates.' });
+        }
+
+        let aiAnalysis = {
+          status: 'not_run',
+          model: null,
+          detections: [],
+          prediction: null,
+          message: imageName ? null : 'No photo was uploaded.'
+        };
+
+        if (imageName) {
+          const analysis = await runYolo(path.join(EVIDENCE_DIR, imageName));
+          const prediction = analysis.status === 'inference_complete'
+            ? classifyYolo(analysis.detections) : null;
+
+          aiAnalysis = {
+            status: analysis.status,
+            model: analysis.model || null,
+            detections: analysis.detections || [],
+            prediction,
+            message: analysis.message || null,
+            scene: analysis.scene || null
+          };
+
+          if (prediction) {
+            audit('yolo_inference_completed', 'complaint', id, {
+              className: prediction.className,
+              confidence: prediction.confidence
+            });
+          }
+        }
+
+        const complaint = {
+          id, category, location, lat, lng, description,
+          status: 'Submitted',
+          priority: 'Awaiting review',
+          image: imageName ? `/api/complaint-image/${imageName}` : null,
+          reporter: {
+            id: currentUser.id,
+            email: currentUser.email,
+            name: currentUser.displayName
+          },
+          createdAt: now,
+          updatedAt: now,
+          adminNote: '',
+          gps: {
+            available: lat !== null && lng !== null,
+            source: gpsSource,
+            lat,
+            lng
+          },
+          aiAnalysis
+        };
+
+        db.prepare(
+          'INSERT INTO complaints(id,user_id,data,created_at,updated_at) VALUES(?,?,?,?,?)'
+        ).run(id, currentUser.id, JSON.stringify(complaint), now, now);
+
+        audit('citizen_complaint_submitted', 'complaint', id, {
+          category,
+          userId: currentUser.id,
+          hasGps: lat !== null && lng !== null,
+          gpsSource,
+          hasImage: Boolean(imageName)
+        });
+
+        console.log('[GEOTAG] Complaint saved:', { id, lat, lng, gpsSource });
+
+        insights.autoApproveComplaint(id);
+        const fresh = db.prepare('SELECT data FROM complaints WHERE id=?').get(id);
+
+        return json(res, 201, {
+          item: fresh ? JSON.parse(fresh.data) : complaint
+        });
+      }

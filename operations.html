@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b2545" />
+  <meta name="description" content="StreetSense operations desk — road-defect register, live map, work orders and community inbox for city maintenance teams." />
+  <title>StreetSense — Operations desk</title>
+  <script>
+    /* Apply the saved theme before first paint to avoid a flash. */
+    try {
+      var t = localStorage.getItem('streetsense-theme-v1');
+      if (!t) t = 'light';
+      document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';
+    } catch (e) {}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="ss-base.css" />
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body class="ops">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <a class="brand" href="operations.html" aria-label="StreetSense operations desk">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="icons.svg#i-logo"/></svg>
+      <span class="brand-name">StreetSense<small>Operations desk</small></span>
+    </a>
+
+    <nav class="tabs" id="tabs" aria-label="Primary">
+      <button class="tab active" data-view="overview"><svg class="i"><use href="icons.svg#i-overview"/></svg><span class="tab-no">01</span><span class="tab-label">Overview</span></button>
+      <button class="tab" data-view="live-map"><svg class="i"><use href="icons.svg#i-map"/></svg><span class="tab-no">02</span><span class="tab-label">Live map</span></button>
+      <button class="tab" data-view="reports"><svg class="i"><use href="icons.svg#i-reports"/></svg><span class="tab-no">03</span><span class="tab-label">Reports</span><em class="tab-count" id="report-count">0</em></button>
+      <button class="tab" data-view="work-orders"><svg class="i"><use href="icons.svg#i-orders"/></svg><span class="tab-no">04</span><span class="tab-label">Work orders</span><em class="tab-count" id="wo-count">0</em></button>
+      <button class="tab" data-view="analytics"><svg class="i"><use href="icons.svg#i-analytics"/></svg><span class="tab-no">05</span><span class="tab-label">Analytics</span></button>
+      <button class="tab" data-view="inbox"><svg class="i"><use href="icons.svg#i-inbox"/></svg><span class="tab-no">06</span><span class="tab-label">Inbox</span><em class="tab-count hidden" id="inbox-count">0</em></button>
+    </nav>
+
+    <div class="tools">
+      <span class="system-status" id="system-status"><span class="pulse-dot"></span> Checking server…</span>
+      <span class="local-save-pill" id="save-pill">Saved on this device</span>
+      <span class="clock" id="local-clock" aria-label="India local time"></span>
+      <button class="tool-btn" id="top-search-button" title="Search and quick actions (Ctrl+K)" aria-label="Search and quick actions"><svg class="i"><use href="icons.svg#i-search"/></svg></button>
+      <button class="tool-btn" id="theme-toggle" title="Switch colour theme" aria-label="Switch colour theme"><svg class="i"><use href="icons.svg#i-moon"/></svg></button>
+      <div class="menu-wrap">
+        <button class="tool-btn" id="notification-button" aria-haspopup="true" aria-expanded="false" aria-label="Notifications"><svg class="i"><use href="icons.svg#i-bell"/></svg><i class="notify-dot hidden" id="notify-dot"></i></button>
+        <section class="dropdown notify-panel" id="notification-panel" aria-label="Open issues needing attention">
+          <div class="dropdown-head"><strong>Needs attention</strong><span class="kicker">Critical &amp; high</span></div>
+          <div id="notification-list"></div>
+          <div class="dropdown-foot"><button class="link-btn" id="notification-view-all">Open report register</button></div>
+        </section>
+      </div>
+      <div class="menu-wrap">
+        <button class="user-chip" id="user-chip" aria-haspopup="true" aria-expanded="false"><span class="avatar" id="user-avatar">?</span><span class="user-copy"><b id="user-name">Guest</b><small id="user-role">Sample workspace</small></span></button>
+        <section class="dropdown user-menu" id="user-menu" aria-label="Account">
+          <a href="/admin.html"><svg class="i"><use href="icons.svg#i-shield"/></svg> Admin console</a>
+          <a href="/" target="_blank" rel="noopener"><svg class="i"><use href="icons.svg#i-arrow"/></svg> Citizen portal</a>
+          <button id="open-methodology"><svg class="i"><use href="icons.svg#i-other"/></svg> How it works</button>
+          <button id="user-signin"><svg class="i"><use href="icons.svg#i-key"/></svg> Sign in as administrator</button>
+          <button id="user-signout" class="hidden"><svg class="i"><use href="icons.svg#i-logout"/></svg> Sign out</button>
+        </section>
+      </div>
+    </div>
+  </header>
+
+  <div class="session-banner hidden" id="session-banner" role="status">
+    <span><b>Sample workspace.</b> Records on this screen are saved in this browser only. Sign in as an administrator to load and save the server register and read community complaints.</span>
+    <button class="btn btn-sm btn-ink" id="banner-signin">Sign in</button>
+  </div>
+
+  <main class="page" id="main">
+
+    <!-- ============ 01 OVERVIEW ============ -->
+    <section class="view active" id="view-overview" aria-labelledby="brief-headline">
+      <div class="brief">
+        <div class="brief-main">
+          <div class="sheet-tag"><span class="plate">SHEET 01</span><span class="kicker" id="brief-date"></span></div>
+          <h1 class="display brief-headline" id="brief-headline">Loading the register…</h1>
+          <hr class="lane" />
+          <p class="brief-body" id="brief-body"></p>
+          <div class="brief-actions">
+            <button class="btn btn-primary" id="new-report-button"><svg class="i"><use href="icons.svg#i-plus"/></svg> Log field report</button>
+            <button class="btn" id="export-overview"><svg class="i"><use href="icons.svg#i-download"/></svg> Export register</button>
+          </div>
+        </div>
+        <dl class="ledger" aria-label="Key figures">
+          <div class="ledger-cell"><dt>Open incidents</dt><dd id="stat-open">0</dd><small id="stat-open-note"></small></div>
+          <div class="ledger-cell"><dt>Critical</dt><dd class="is-crit" id="stat-critical">0</dd><small>Open and rated critical</small></div>
+          <div class="ledger-cell"><dt>Awaiting assignment</dt><dd id="stat-unassigned">0</dd><small>No crew allocated yet</small></div>
+          <div class="ledger-cell"><dt>Resolved</dt><dd id="stat-resolved">0<span class="unit">%</span></dd><div class="bar"><span id="stat-resolved-bar" style="width:0"></span></div></div>
+        </dl>
+      </div>
+
+      <div class="deck">
+        <article class="sheet map-sheet">
+          <header class="sheet-head">
+            <div><span class="kicker">Incident map</span><h2>New Delhi region</h2></div>
+            <div class="head-tools">
+              <div class="seg" id="map-filter" role="group" aria-label="Filter map by severity">
+                <button class="selected" data-filter="all">All <b data-count="all">0</b></button>
+                <button data-filter="critical">Critical</button>
+                <button data-filter="high">High</button>
+              </div>
+              <button class="icon-btn" id="map-locate" title="Fit map to incidents" aria-label="Fit map to incidents"><svg class="i"><use href="icons.svg#i-locate"/></svg></button>
+              <button class="link-btn" data-goto="live-map">Full map</button>
+            </div>
+          </header>
+          <div class="map-frame">
+            <div id="map" aria-label="Map of reported road defects"></div>
+            <i class="crop tl"></i><i class="crop tr"></i><i class="crop bl"></i><i class="crop br"></i>
+            <div class="north" aria-hidden="true"><svg viewBox="0 0 24 32"><path d="M12 2l7 22-7-5-7 5z" fill="currentColor"/><text x="12" y="31" text-anchor="middle" font-size="8" font-family="IBM Plex Mono, monospace" fill="currentColor">N</text></svg></div>
+          </div>
+          <footer class="legend">
+            <span class="sev s-critical"><b class="bars"><i></i><i></i><i></i><i></i></b>Critical <b class="count" id="legend-critical">0</b></span>
+            <span class="sev s-high"><b class="bars"><i></i><i></i><i></i><i></i></b>High <b class="count" id="legend-high">0</b></span>
+            <span class="sev s-medium"><b class="bars"><i></i><i></i><i></i><i></i></b>Medium <b class="count" id="legend-medium">0</b></span>
+            <span class="sev s-low"><b class="bars"><i></i><i></i><i></i><i></i></b>Low <b class="count" id="legend-low">0</b></span>
+            <span class="legend-note">Map © OpenStreetMap contributors</span>
+          </footer>
+        </article>
+
+        <article class="sheet queue-sheet">
+          <header class="sheet-head">
+            <div><span class="kicker">Dispatch queue</span><h2>Next up</h2></div>
+            <button class="link-btn" data-goto="reports">All reports</button>
+          </header>
+          <ol class="queue" id="priority-table-body"></ol>
+        </article>
+      </div>
+
+      <div class="trio">
+        <article class="sheet intake">
+          <header class="sheet-head"><div><span class="kicker">Evidence intake</span><h2>Add street photo</h2></div></header>
+          <div class="sheet-body">
+            <div class="model-line" id="model-status"><i class="dot"></i><span>Checking detection model…</span></div>
+            <div class="upload-zone" id="upload-zone" tabindex="0" role="button" aria-label="Choose a street photo to upload">
+              <input type="file" id="evidence-input" accept="image/jpeg,image/png,image/webp" hidden />
+              <svg class="i i-lg"><use href="icons.svg#i-upload"/></svg>
+              <strong>Drop a photo here</strong>
+              <span>or <u>browse files</u></span>
+              <small>JPG · PNG · WebP · stored images up to 8 MB</small>
+            </div>
+            <div class="upload-preview hidden" id="upload-preview">
+              <div class="preview-thumb" id="preview-thumb"></div>
+              <div class="preview-details"><strong id="preview-name">evidence.jpg</strong><span id="preview-meta"></span></div>
+              <button class="icon-btn" id="remove-file" aria-label="Remove file"><svg class="i"><use href="icons.svg#i-close"/></svg></button>
+            </div>
+            <div class="analysis-progress hidden" id="analysis-progress">
+              <div class="progress-label"><span id="analysis-label">Preparing evidence…</span><b id="analysis-percent">0%</b></div>
+              <div class="bar"><span id="analysis-bar"></span></div>
+            </div>
+            <button class="btn btn-ink btn-block" id="analyze-button" disabled>Save &amp; analyse photo</button>
+            <p class="fine">Every model suggestion stays <b>pending human review</b> — nothing is dispatched automatically.</p>
+            <div class="mini-head"><span class="kicker">Recently stored</span></div>
+            <ul class="evidence-list" id="recent-intake-list"></ul>
+          </div>
+        </article>
+
+        <article class="sheet pipeline">
+          <header class="sheet-head">
+            <div><span class="kicker">Field operations</span><h2>Repair pipeline</h2></div>
+            <button class="link-btn" data-goto="work-orders">Work orders</button>
+          </header>
+          <div class="sheet-body" id="pipeline-body"></div>
+        </article>
+
+        <article class="sheet mix">
+          <header class="sheet-head">
+            <div><span class="kicker">Defect mix</span><h2>By category</h2></div>
+            <button class="link-btn" data-goto="analytics">Analytics</button>
+          </header>
+          <div class="sheet-body" id="mix-list"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ 02 LIVE MAP ============ -->
+    <section class="view" id="view-live-map" aria-labelledby="h-live-map">
+      <div class="view-head">
+        <div>
+          <div class="sheet-tag"><span class="plate">SHEET 02</span><span class="kicker">Geospatial operations</span></div>
+          <h1 class="display" id="h-live-map">Every issue, on the map</h1>
+          <p class="view-sub">Click a pin or a list entry to inspect risk, status and the assigned crew.</p>
+        </div>
+        <div class="view-actions"><button class="btn btn-primary" id="map-report-button"><svg class="i"><use href="icons.svg#i-plus"/></svg> Log field report</button></div>
+      </div>
+      <div class="map-workspace">
+        <aside class="map-side">
+          <div class="map-side-top">
+            <div class="seg" id="full-map-filter" role="group" aria-label="Filter by severity">
+              <button class="selected" data-filter="all">All</button><button data-filter="critical">Crit</button><button data-filter="high">High</button><button data-filter="medium">Med</button><button data-filter="low">Low</button>
+            </div>
+            <span class="kicker" id="map-count"></span>
+          </div>
+          <ol class="map-list" id="map-list"></ol>
+          <div class="map-detail" id="map-side-card"></div>
+        </aside>
+        <div class="map-big">
+          <div id="full-map" aria-label="Full incident map"></div>
+          <button class="icon-btn map-reset" id="full-map-reset" title="Fit map to incidents" aria-label="Fit map to incidents"><svg class="i"><use href="icons.svg#i-locate"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 03 REPORTS ============ -->
+    <section class="view" id="view-reports" aria-labelledby="h-reports">
+      <div class="view-head">
+        <div>
+          <div class="sheet-tag"><span class="plate">SHEET 03</span><span class="kicker">Evidence register</span></div>
+          <h1 class="display" id="h-reports">Incident reports</h1>
+          <p class="view-sub">One searchable record of every defect logged by crews, citizens and photo analysis.</p>
+        </div>
+        <div class="view-actions">
+          <button class="btn" id="export-reports"><svg class="i"><use href="icons.svg#i-download"/></svg> Export CSV</button>
+          <button class="btn btn-primary" id="reports-new-button"><svg class="i"><use href="icons.svg#i-plus"/></svg> New report</button>
+        </div>
+      </div>
+      <div class="strip">
+        <div><b id="reports-total">0</b><span>Total reports</span></div>
+        <div><b class="is-crit" id="reports-critical">0</b><span>Critical</span></div>
+        <div><b id="reports-unassigned">0</b><span>Awaiting assignment</span></div>
+        <div><b id="reports-confidence">—</b><span>Avg. model confidence</span></div>
+      </div>
+      <article class="sheet">
+        <div class="toolbar">
+          <label class="search-field"><svg class="i"><use href="icons.svg#i-search"/></svg><input id="report-search" type="search" placeholder="Search ID, defect or location" aria-label="Search reports" /></label>
+          <select class="control" id="severity-filter" aria-label="Filter by severity"><option value="all">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+          <select class="control" id="status-filter" aria-label="Filter by status"><option value="all">All statuses</option><option value="open">Open</option><option value="assigned">Assigned</option><option value="in-progress">In progress</option><option value="resolved">Resolved</option></select>
+          <select class="control" id="sort-filter" aria-label="Sort reports"><option value="severity">Sort: severity</option><option value="newest">Sort: newest</option><option value="location">Sort: location</option></select>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Report</th><th>Defect</th><th>Location</th><th>Reported</th><th>Severity</th><th class="num">Model</th><th>Status</th><th><span class="sr-only">Work order</span></th></tr></thead>
+            <tbody id="reports-table-body"></tbody>
+          </table>
+        </div>
+        <footer class="table-foot"><span id="report-results-count"></span><span>Model confidence is only shown for photo-analysed reports.</span></footer>
+      </article>
+    </section>
+
+    <!-- ============ 04 WORK ORDERS ============ -->
+    <section class="view" id="view-work-orders" aria-labelledby="h-orders">
+      <div class="view-head">
+        <div>
+          <div class="sheet-tag"><span class="plate">SHEET 04</span><span class="kicker">Municipal response</span></div>
+          <h1 class="display" id="h-orders">From report to repair</h1>
+          <p class="view-sub">Drag a card to change its stage, or use the menus on the card. Incident status follows automatically.</p>
+        </div>
+        <div class="view-actions"><button class="btn btn-primary" id="create-work-order"><svg class="i"><use href="icons.svg#i-plus"/></svg> New work order</button></div>
+      </div>
+      <div class="strip">
+        <div><b id="wo-total">0</b><span>Total orders</span></div>
+        <div><b id="wo-pending">0</b><span>Awaiting crew</span></div>
+        <div><b id="wo-progress">0</b><span>In progress</span></div>
+        <div><b id="wo-done">0</b><span>Resolved</span></div>
+      </div>
+      <div class="kanban" id="kanban-board"></div>
+    </section>
+
+    <!-- ============ 05 ANALYTICS ============ -->
+    <section class="view" id="view-analytics" aria-labelledby="h-analytics">
+      <div class="view-head">
+        <div>
+          <div class="sheet-tag"><span class="plate">SHEET 05</span><span class="kicker">Performance &amp; insight</span></div>
+          <h1 class="display" id="h-analytics">See the whole picture</h1>
+          <p class="view-sub">Every figure on this sheet is calculated from the incident register unless marked as sample.</p>
+        </div>
+        <div class="view-actions"><button class="btn" id="export-analytics"><svg class="i"><use href="icons.svg#i-download"/></svg> Export CSV</button></div>
+      </div>
+      <div class="an-grid">
+        <article class="sheet an-hot"><header class="sheet-head"><div><span class="kicker">Hotspot areas</span><h2>Where to look first</h2></div></header><div class="sheet-body" id="an-hotspots"></div></article>
+        <article class="sheet an-cat"><header class="sheet-head"><div><span class="kicker">Defect mix</span><h2>By category</h2></div></header><div class="sheet-body" id="an-category"></div></article>
+        <article class="sheet an-sev"><header class="sheet-head"><div><span class="kicker">Risk</span><h2>By severity</h2></div></header><div class="sheet-body" id="an-severity"></div></article>
+        <article class="sheet an-stat"><header class="sheet-head"><div><span class="kicker">Progress</span><h2>By status</h2></div></header><div class="sheet-body" id="an-status"></div></article>
+        <article class="sheet an-ins"><header class="sheet-head"><div><span class="kicker">Reading the data</span><h2>Insight</h2></div></header><div class="sheet-body" id="an-insight"></div></article>
+        <article class="sheet an-trend"><header class="sheet-head"><div><span class="kicker">Weekly volume</span><h2>Reports over time</h2></div><span class="tag-sample">Sample data</span></header><div class="sheet-body"><div id="an-trend"></div><p class="fine">Illustrative shape only. Individual reports will be charted here once every record carries a timestamp.</p></div></article>
+      </div>
+    </section>
+
+    <!-- ============ 06 INBOX ============ -->
+    <section class="view" id="view-inbox" aria-labelledby="h-inbox">
+      <div class="view-head">
+        <div>
+          <div class="sheet-tag"><span class="plate">SHEET 06</span><span class="kicker">Community complaints</span></div>
+          <h1 class="display" id="h-inbox">Citizen inbox</h1>
+          <p class="view-sub">Complaints from the public portal. Promote a verified one to the incident register in a single step.</p>
+        </div>
+        <div class="view-actions">
+          <a class="btn" href="/admin.html"><svg class="i"><use href="icons.svg#i-shield"/></svg> Admin console</a>
+          <button class="btn" id="inbox-refresh"><svg class="i"><use href="icons.svg#i-refresh"/></svg> Refresh</button>
+        </div>
+      </div>
+      <article class="sheet">
+        <div class="toolbar">
+          <label class="search-field"><svg class="i"><use href="icons.svg#i-search"/></svg><input id="inbox-search" type="search" placeholder="Search complaints" aria-label="Search complaints" /></label>
+          <select class="control" id="inbox-filter" aria-label="Filter by complaint status"><option value="">All statuses</option><option>Submitted</option><option>Under review</option><option>Assigned</option><option>In progress</option><option>Resolved</option><option>Rejected</option></select>
+        </div>
+        <div class="inbox-list" id="inbox-list"></div>
+      </article>
+    </section>
+
+    <footer class="page-foot">
+      <span class="kicker">StreetSense · Urban observation network</span>
+      <span class="foot-links"><button class="link-btn" id="foot-how">How it works</button><a class="link-btn" href="/">Citizen portal</a><a class="link-btn" href="/admin.html">Admin console</a></span>
+    </footer>
+  </main>
+
+  <!-- ============ MODALS ============ -->
+  <div class="modal-backdrop" id="report-modal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+      <div class="modal-head"><div><span class="kicker">Field report</span><h2 id="report-modal-title">Log a defect</h2><p>Add an observation to the incident register. It starts as <b>Open</b> until a work order is raised.</p></div><button class="icon-btn" data-close-modal aria-label="Close"><svg class="i"><use href="icons.svg#i-close"/></svg></button></div>
+      <form class="modal-body" id="report-form">
+        <div class="form-grid">
+          <label class="field"><span>Defect type</span><select id="form-type" required><option>Pothole</option><option>Road crack</option><option>Damaged sign</option><option>Broken streetlight</option><option>Blocked drain</option><option>Other</option></select></label>
+          <label class="field"><span>Severity</span><select id="form-severity" required><option>Critical</option><option selected>High</option><option>Medium</option><option>Low</option></select></label>
+          <label class="field span-2"><span>Location</span><input id="form-location" required maxlength="240" placeholder="e.g. Lajpat Nagar, near Central Market" /></label>
+          <label class="field"><span>Latitude (optional)</span><input id="form-lat" type="number" step="any" min="-90" max="90" placeholder="28.5677" /></label>
+          <label class="field"><span>Longitude (optional)</span><input id="form-lng" type="number" step="any" min="-180" max="180" placeholder="77.2433" /></label>
+          <div class="span-2"><button class="btn btn-sm" type="button" id="form-locate"><svg class="i i-sm"><use href="icons.svg#i-locate"/></svg> Use my current location</button></div>
+          <label class="field span-2"><span>Observation</span><textarea id="form-description" rows="3" maxlength="2000" placeholder="Size, depth, traffic impact, anything the crew should know"></textarea></label>
+        </div>
+        <div class="modal-actions"><span class="note">Pins without coordinates are placed approximately and marked as such.</span><button class="btn" type="button" data-close-modal>Cancel</button><button class="btn btn-primary" type="submit">Save report</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="detail-modal" aria-hidden="true">
+    <div class="modal-card detail-card" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+      <div class="modal-head"><div><span class="kicker">Incident record</span><h2 id="detail-title">Incident</h2></div><button class="icon-btn" data-close-modal aria-label="Close"><svg class="i"><use href="icons.svg#i-close"/></svg></button></div>
+      <div class="modal-body" id="detail-content"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="wo-modal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="wo-modal-title">
+      <div class="modal-head"><div><span class="kicker">Municipal response</span><h2 id="wo-modal-title">New work order</h2><p>Turn a logged incident into a trackable repair task.</p></div><button class="icon-btn" data-close-modal aria-label="Close"><svg class="i"><use href="icons.svg#i-close"/></svg></button></div>
+      <form class="modal-body" id="wo-form">
+        <div class="form-grid">
+          <label class="field span-2"><span>Incident</span><select id="wo-incident" required></select></label>
+          <label class="field span-2"><span>Task title</span><input id="wo-title" required maxlength="120" /></label>
+          <label class="field"><span>Crew</span><select id="wo-team"></select></label>
+          <label class="field"><span>Due date</span><input id="wo-due" type="date" /></label>
+        </div>
+        <div class="modal-actions"><button class="btn" type="button" data-close-modal>Cancel</button><button class="btn btn-primary" type="submit">Create work order</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="methodology-modal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="method-title">
+      <div class="modal-head"><div><span class="kicker">The StreetSense workflow</span><h2 id="method-title">From street evidence to civic action</h2><p>A human-in-the-loop pipeline. Software suggests; people decide.</p></div><button class="icon-btn" data-close-modal aria-label="Close"><svg class="i"><use href="icons.svg#i-close"/></svg></button></div>
+      <ol class="method-steps">
+        <li><span class="plate">01</span><div><strong>Capture</strong><p>Photos from crews and citizens, or a field report with a location.</p></div></li>
+        <li><span class="plate">02</span><div><strong>Classify</strong><p>If a trained road-defect model is installed it suggests a defect class and confidence. Without one, the photo is stored and flagged for manual review.</p></div></li>
+        <li><span class="plate">03</span><div><strong>Verify &amp; prioritise</strong><p>A reviewer confirms the defect and sets severity from type, extent and road-user impact.</p></div></li>
+        <li><span class="plate">04</span><div><strong>Dispatch</strong><p>A verified incident becomes a work order with a crew and a due date. Status flows back to the register.</p></div></li>
+      </ol>
+      <p class="method-note">Model output is decision support and must be checked by an authorised reviewer before any municipal action.</p>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="signin-modal" aria-hidden="true">
+    <div class="modal-card narrow" role="dialog" aria-modal="true" aria-labelledby="signin-title">
+      <div class="modal-head"><div><span class="kicker">Restricted access</span><h2 id="signin-title">Administrator sign in</h2><p id="signin-copy">Sign in to load and save the server register.</p></div><button class="icon-btn" data-close-modal aria-label="Close"><svg class="i"><use href="icons.svg#i-close"/></svg></button></div>
+      <form class="modal-body" id="signin-form">
+        <div class="form-grid">
+          <label class="field span-2"><span>Email address</span><input id="signin-email" type="email" autocomplete="username" required /></label>
+          <label class="field span-2"><span>Password</span><input id="signin-password" type="password" autocomplete="current-password" required /></label>
+        </div>
+        <div class="form-error" id="signin-error" role="alert"></div>
+        <div class="modal-actions"><button class="btn" type="button" data-close-modal>Cancel</button><button class="btn btn-primary" type="submit">Sign in</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ COMMAND PALETTE ============ -->
+  <div class="modal-backdrop palette-backdrop" id="command-backdrop" aria-hidden="true">
+    <section class="palette" role="dialog" aria-modal="true" aria-label="Search and quick actions">
+      <div class="palette-search"><svg class="i"><use href="icons.svg#i-search"/></svg><input id="command-search" type="search" autocomplete="off" placeholder="Search pages, actions or an incident ID" aria-label="Search pages, actions or incidents" /><kbd>Esc</kbd></div>
+      <div class="palette-results" id="command-results" role="listbox"></div>
+      <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> run</span><span><kbd>Ctrl</kbd><kbd>K</kbd> toggle</span></div>
+    </section>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="geotag.js?v=1"></script>
+  <script src="backend-client.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

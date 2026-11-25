@@ -1,0 +1,20 @@
+StreetSense - complete update 20: approval modes + clear all data (replaces earlier zips)
+=========================================================================================
+Copy ALL of these into your StreetSense folder (overwrite if asked):
+
+  server.js, insights.js                      <- the server (must match the pages)
+  admin.html, admin.js                        <- new Settings page, Approve / Reject buttons
+  insights-ui.js, insights.html, insights.css, introduction.html, introduction.js
+  ai/infer.py, ai/infer_video.py, ai/model_info.py     <- inside your existing "ai" folder
+  models/yolo11n.pt, models/model_info.json            <- inside your existing "models" folder (do NOT replace road_defects.pt)
+  portal.js, scan.js, status.js, index.html, transparency.html, transparency.js, scan.html
+  backend-client.js, app.js, portal.css, operations.html, ss-base.css, dashboard.css, icons.svg
+  DEPLOYMENT.md, deploy/
+
+New in the Admin console:
+  Settings > Approval mode:  Manual (default) or Auto
+     Manual: each new report waits; press Approve (creates an incident + repair order) or Reject.
+     Auto:   reports with a map location, and AI detections at or above your confidence, are approved automatically.
+  Settings > Clear all data: type DELETE ALL DATA. Accounts are kept; a database backup is saved first in data/backups.
+
+Then fully stop and restart start.bat and reload with Ctrl+F5.

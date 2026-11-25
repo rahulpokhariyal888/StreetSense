@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StreetSense — Methodology</title>
+<script>try{var t=localStorage.getItem('streetsense-theme-v1');if(t)document.documentElement.dataset.theme=t==='dark'?'dark':'light'}catch(e){}</script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/insights.css?v=7"></head>
+<body>
+<header class="bar"><h1 class="brand">StreetSense · Methodology</h1><div><a href="/">Report a problem</a><a href="/transparency.html">Repair tracker</a></div></header>
+<section class="hero"><h1>Cities cannot fix what they cannot see.</h1><p>StreetSense turns ordinary road images into mapped, ranked repair tasks: detect earlier, prioritise smarter, repair faster. This page shows exactly how it decides, what it can and cannot do yet, and where the data comes from.</p></section>
+<main>
+<div class="sect"><h2>The pipeline</h2></div>
+<div class="steps">
+ <div class="card"><b>Image input</b><div class="mute">Street photos, dashcam or phone footage, fleet feeds.</div></div>
+ <div class="card"><b>Preprocess to 640 px</b><div class="mute">Every image is resized before detection.</div></div>
+ <div class="card"><b>YOLO11n detection</b><div class="mute">Finds and classifies defects, with a confidence score on each.</div></div>
+ <div class="card"><b>Incident mapping</b><div class="mute">Each confirmed defect becomes a location-tagged record on the map (phone GPS or a map pin).</div></div>
+ <div class="card"><b>Prioritisation</b><div class="mute">A published score ranks urgent issues first.</div></div>
+ <div class="card"><b>Review &amp; repair tracking</b><div class="mute">Work orders, crews, before/after photos, metrics.</div></div>
+</div>
+
+<div class="sect"><h2>Human in the loop</h2></div>
+<div class="card"><p id="policy">Every AI detection waits in a review queue.</p><p class="mute">Uncertain detections are shown to the reviewer first. Because baseline precision is about 70%, no result triggers a repair without a person confirming it.</p></div>
+
+<div class="sect"><h2>How priority is ranked</h2></div>
+<div class="card"><p id="formula"></p><div class="grid g3"><div class="tablewrap" id="weights"></div><div class="tablewrap" id="grades"></div><div class="tablewrap" id="sla"></div></div><h3 style="margin-top:12px">Liability flags</h3><ul id="flags"></ul><p class="mute" id="extentnote"></p></div>
+
+<div class="sect"><h2>Where the model stands today</h2></div>
+<div class="grid g2"><div class="card"><h3>Baseline</h3><div id="base"></div></div><div class="card"><h3>Live reviewer check</h3><div id="live"></div></div></div>
+
+<div class="sect"><h2>Risks and how they are handled</h2></div>
+<div class="card tablewrap"><table><tr><th>Risk</th><th>How it is handled</th><th>Status</th></tr>
+<tr><td>False positives</td><td>Low scores go to a reviewer</td><td><span class="tag now">NOW</span></td></tr>
+<tr><td>Missed defects</td><td>Track recall, tune first</td><td><span class="tag next">NEXT</span></td></tr>
+<tr><td>Lighting &amp; weather</td><td>Add varied images, retrain</td><td><span class="tag next">NEXT</span></td></tr>
+<tr><td>Dataset bias</td><td>Add local-road images</td><td><span class="tag next">NEXT</span></td></tr>
+<tr><td>Missing GPS</td><td>Use phone GPS or a map pin</td><td><span class="tag now">NOW</span></td></tr>
+<tr><td>Dataset licence</td><td>Cited; images not bundled</td><td><span class="tag now">NOW</span></td></tr>
+<tr><td>Trust in AI output</td><td>A person reviews first</td><td><span class="tag now">NOW</span></td></tr>
+<tr><td>Opaque priority scores</td><td>The ranking rules are published above</td><td><span class="tag now">NOW</span></td></tr>
+<tr><td>Integration effort</td><td>Start with simple upload</td><td><span class="tag now">NOW</span></td></tr></table></div>
+
+<div class="sect"><h2>Why StreetSense is different</h2></div>
+<div class="card tablewrap"><table><tr><th></th><th>Manual inspection</th><th>Citizen complaints</th><th>Survey vehicles</th><th>StreetSense</th></tr>
+<tr><td>Data source</td><td>Inspector visits</td><td>Citizen reports</td><td>Specialised sensors</td><td><b>Ordinary road images</b></td></tr>
+<tr><td>Speed</td><td>Slow</td><td>Reactive</td><td>Fast, but costly</td><td><b>Automated</b></td></tr>
+<tr><td>Location mapping</td><td>Manual notes</td><td>Citizen-reported</td><td>Yes</td><td><b>Yes, incident map</b></td></tr>
+<tr><td>Prioritisation</td><td>Inspector judgement</td><td>Limited</td><td>Varies</td><td><b>Severity ranking</b></td></tr>
+<tr><td>Repair tracking</td><td>Separate records</td><td>Separate system</td><td>Separate system</td><td><b>Yes</b></td></tr></table></div>
+
+<div class="sect"><h2>Who benefits</h2></div>
+<div class="grid g4"><div class="card"><b>Citizens</b><div class="mute">Better visibility of defects and potentially safer roads.</div></div><div class="card"><b>Municipalities</b><div class="mute">Better inspection data and maintenance planning.</div></div><div class="card"><b>Maintenance teams</b><div class="mute">Clear priorities and easier incident tracking.</div></div><div class="card"><b>Cities</b><div class="mute">Structured, data-driven infrastructure management.</div></div></div>
+
+<div class="sect"><h2>What is built</h2></div>
+<div class="card tablewrap"><table><tr><th>Feature</th><th>Phase</th><th>Where</th></tr>
+<tr><td>Image upload, AI detection, class and confidence, boxes on the image</td><td>1</td><td><a href="/scan.html">Scan an image</a> (staff)</td></tr>
+<tr><td>Incident records and map, severity ranking and filters</td><td>1</td><td><a href="/operations.html">Operations desk</a>, <a href="/insights.html">Intelligence desk</a></td></tr>
+<tr><td>Analytics dashboard</td><td>2</td><td>Operations desk, Intelligence desk</td></tr>
+<tr><td>Incident management and human review</td><td>2</td><td>Intelligence desk → Review queue</td></tr>
+<tr><td>Work orders, routes and repair tracking, before/after photos</td><td>2</td><td>Intelligence desk → Work orders, Repair verification, Crew view</td></tr>
+<tr><td>Performance metrics</td><td>2</td><td>Intelligence desk → Metrics &amp; footage</td></tr>
+</table><p class="mute" style="margin-top:10px"><b>Planned for later:</b> fleet and citizen image capture, live fleet feeds and municipal API integrations.</p></div>
+
+<div class="sect"><h2>Data and licence</h2></div>
+<div class="card"><p>Dataset: RDD2022 (Geoscience Data Journal, doi:10.1002/gdj3.260; github.com/sekilab/RoadDamageDetector). India-Aug export via Roboflow Universe (rdd2022-india, v6), CC BY 4.0 as shown on the export; the original RDD repository lists CC BY-SA 4.0. Dataset images are not bundled with the platform.</p><p class="mute">Model: YOLO (Ultralytics), YOLO11n baseline. Platform: HTML/CSS/JS, Node.js, SQLite, Leaflet and OpenStreetMap.</p></div>
+</main>
+<script src="/about.js?v=7"></script></body></html>

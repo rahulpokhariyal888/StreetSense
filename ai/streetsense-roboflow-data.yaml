@@ -1,0 +1,16 @@
+path: /tmp/ss_roboflow_test_tle7zcyb
+train: /tmp/ss_roboflow_test_tle7zcyb/train/images
+val: /tmp/ss_roboflow_test_tle7zcyb/valid/images
+nc: 10
+names:
+  0: D00
+  1: D01
+  2: D0w0
+  3: D10
+  4: D11
+  5: D20
+  6: D40
+  7: D43
+  8: D44
+  9: D50
+test: /tmp/ss_roboflow_test_tle7zcyb/test/images

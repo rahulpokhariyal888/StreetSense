@@ -1,0 +1,37 @@
+{
+  "weights": "road_defects.pt",
+  "readAt": "2026-11-18T03:58:57",
+  "model": "YOLO11n",
+  "classes": [
+    "D00",
+    "D01",
+    "D0w0",
+    "D10",
+    "D11",
+    "D20",
+    "D40",
+    "D43",
+    "D44",
+    "D50",
+    "waterlogging",
+    "road_edge_breakage",
+    "failed_repair_patch",
+    "asphalt_ravelling",
+    "surface_bleeding"
+  ],
+  "trainedAt": "2026-11-09T19:07:09.386526+05:30",
+  "ultralyticsVersion": "8.4.202",
+  "trainingImageSize": 416,
+  "epochs": 20,
+  "epochsRecorded": 20,
+  "batch": 4,
+  "device": "cpu",
+  "trainingConfig": "streetsense_v2.yaml",
+  "validation": {
+    "precisionPct": 47.3,
+    "recallPct": 34.8,
+    "map50Pct": 35.2,
+    "map5095Pct": 21.3
+  },
+  "peakPrecisionAnyEpochPct": 71.5
+}
