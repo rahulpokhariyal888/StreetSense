@@ -1,0 +1,42 @@
+# Node dependencies
+node_modules/
+
+# Python environments
+.venv-ai/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# SQLite databases and backups
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+data/backups/
+
+# Uploaded evidence and generated files
+data/evidence/
+data/video/
+
+# AI model weights
+models/*.pt
+!models/README.md
+
+# Dataset and training outputs
+dataset/
+runs/
+wandb/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
